@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: lq
+          POSTGRES_PASSWORD: lq
+          POSTGRES_DB: lq
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lq -d lq"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgres://lq:lq@localhost:5432/lq?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: build
+        run: go build ./...
+      - name: vet
+        run: go vet ./...
+      - name: gofmt
+        run: test -z "$(gofmt -l .)"
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.14
+      - name: test
+        run: go test ./...

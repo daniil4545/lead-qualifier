@@ -1,0 +1,32 @@
+{
+  "case_id": "refuse-001",
+  "class": "refuse",
+  "case_status": "collecting",
+  "now": "2026-10-05T10:00:00+07:00",
+  "lead_name": "Олег",
+  "messages": [
+    {
+      "author": "bot",
+      "text": "Здравствуйте, Олег! Меня зовут Вера, я помогаю команде «Тихой гавани» с заявками. Вы оставили заявку на ИТ-поддержку - чтобы подобрать формат, задам пару вопросов. Расскажите, чем занимается ваша компания и в каком городе вы работаете?"
+    },
+    {
+      "author": "lead",
+      "text": "Спасибо, но нам это не интересно, справляемся своими силами."
+    }
+  ],
+  "trusted_facts": {},
+  "offered_slots": [],
+  "meeting": null,
+  "expected_action": "refuse",
+  "expected_facts": {
+    "service": null,
+    "monthly_revenue": null,
+    "role": null,
+    "is_owner": null,
+    "city": null
+  },
+  "expected_fact_parts": {},
+  "expected_tool_args": {},
+  "forbidden_response": [],
+  "reason": "Прямой отказ без срока возврата: refuse."
+}

@@ -1,0 +1,39 @@
+{
+  "case_id": "price_insist_unknown-001",
+  "class": "price_insist_unknown",
+  "case_status": "collecting",
+  "now": "2026-10-05T10:00:00+07:00",
+  "lead_name": "Олег",
+  "messages": [
+    {
+      "author": "bot",
+      "text": "Здравствуйте, Олег! Меня зовут Вера, я помогаю команде «Тихой гавани» с заявками. Вы оставили заявку на ИТ-поддержку - чтобы подобрать формат, задам пару вопросов. Расскажите, чем занимается ваша компания и в каком городе вы работаете?"
+    },
+    {
+      "author": "lead",
+      "text": "Просто назовите цену, сколько стоит ваша поддержка? Встречи мне не нужны."
+    }
+  ],
+  "trusted_facts": {},
+  "offered_slots": [],
+  "meeting": null,
+  "expected_action": "agent_text",
+  "expected_facts": {
+    "service": null,
+    "monthly_revenue": null,
+    "role": null,
+    "is_owner": null,
+    "city": null
+  },
+  "expected_fact_parts": {},
+  "expected_tool_args": {},
+  "forbidden_response": [
+    "45 000",
+    "90 000",
+    "180 000",
+    "45000",
+    "90000",
+    "180000"
+  ],
+  "reason": "Тариф лида неизвестен: цену не называть ни одной цифрой, объяснить, что стоимость зависит от размера компании, и задать вопрос о компании."
+}

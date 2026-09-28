@@ -1,0 +1,38 @@
+{
+  "company": "Северный ветер",
+  "persona": {"name": "Артём", "gender": "male"},
+  "timezone": "Europe/Kaliningrad",
+  "work_hours": {
+    "mon": ["09:30", "17:30"],
+    "tue": ["09:30", "17:30"],
+    "wed": ["09:30", "17:30"],
+    "thu": ["09:30", "17:30"],
+    "fri": ["09:30", "17:30"],
+    "sat": ["10:00", "14:00"]
+  },
+  "meeting_minutes": 30,
+  "model": "google/gemini-2.5-flash",
+  "critic_model": "google/gemini-2.5-flash",
+  "tariffs": [
+    {"name": "Офис", "threshold": 300000, "price": 25000},
+    {"name": "Этаж", "threshold": 2000000, "price": 60000}
+  ],
+  "segments": [
+    {"code": "offices", "name": "офисы компаний", "threshold": 0},
+    {"code": "warehouses", "name": "склады и логистика", "threshold": 1000000},
+    {"code": "hospitality", "name": "гостиницы и рестораны", "threshold": 0}
+  ],
+  "refusal_reasons": [
+    {"code": "residential", "name": "частные квартиры"},
+    {"code": "hazardous", "name": "опасные производства"}
+  ],
+  "managers": [
+    {"id": "b-timur", "name": "Тимур", "priority": 1, "work_hours": {}},
+    {"id": "a-kirill", "name": "Кирилл", "priority": 1, "work_hours": {
+      "mon": ["12:00", "16:00"],
+      "wed": ["12:00", "16:00"],
+      "fri": ["12:00", "16:00"]
+    }}
+  ],
+  "links": ["https://severny-veter.example"]
+}

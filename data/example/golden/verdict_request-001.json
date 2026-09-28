@@ -1,0 +1,46 @@
+{
+  "case_id": "verdict_request-001",
+  "class": "verdict_request",
+  "case_status": "collecting",
+  "now": "2026-10-05T10:00:00+07:00",
+  "lead_name": "Олег",
+  "messages": [
+    {
+      "author": "bot",
+      "text": "Здравствуйте, Олег! Меня зовут Вера, я помогаю команде «Тихой гавани» с заявками. Вы оставили заявку на ИТ-поддержку - чтобы подобрать формат, задам пару вопросов. Расскажите, чем занимается ваша компания и в каком городе вы работаете?"
+    },
+    {
+      "author": "lead",
+      "text": "Сеть магазинов стройматериалов в Бердске, выручка 8 млн, я директор и собственник."
+    },
+    {
+      "author": "bot",
+      "text": "Спасибо, всё записала."
+    },
+    {
+      "author": "lead",
+      "text": "Ну так что, мы вам подходим или нет?"
+    }
+  ],
+  "trusted_facts": {
+    "service": "сеть магазинов стройматериалов",
+    "monthly_revenue": "8000000",
+    "role": "директор",
+    "is_owner": true,
+    "city": "Бердск"
+  },
+  "offered_slots": [],
+  "meeting": null,
+  "expected_action": "complete",
+  "expected_facts": {
+    "service": "стройматериал",
+    "monthly_revenue": "8000000",
+    "role": "директор",
+    "is_owner": true,
+    "city": "бердск"
+  },
+  "expected_fact_parts": {},
+  "expected_tool_args": {},
+  "forbidden_response": [],
+  "reason": "Все пять фактов уже собраны, лид спрашивает решение: complete, судит код."
+}

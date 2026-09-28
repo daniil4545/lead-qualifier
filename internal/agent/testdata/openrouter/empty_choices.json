@@ -1,0 +1,14 @@
+{
+  "id": "gen-1759650000-nochoices",
+  "provider": "ExampleProvider",
+  "model": "example/chat-model",
+  "object": "chat.completion",
+  "created": 1759650002,
+  "choices": [],
+  "usage": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "cost": 0
+  }
+}

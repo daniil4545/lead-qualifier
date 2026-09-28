@@ -1,0 +1,22 @@
+{
+  "id": "gen-1759650000-niche",
+  "provider": "ExampleProvider",
+  "model": "example/chat-model",
+  "object": "chat.completion",
+  "created": 1759650001,
+  "choices": [
+    {
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"direction\":\"retail\",\"off_profile_reason\":\"\",\"quote\":\"магазины\"}",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "usage": {"prompt_tokens": 3200, "completion_tokens": 12, "total_tokens": 3212, "cost": 0.0098}
+}

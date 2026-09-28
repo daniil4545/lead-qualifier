@@ -1,0 +1,34 @@
+{
+  "case_id": "aggression-001",
+  "class": "aggression",
+  "case_status": "collecting",
+  "now": "2026-10-05T10:00:00+07:00",
+  "lead_name": "Олег",
+  "messages": [
+    {
+      "author": "bot",
+      "text": "Здравствуйте, Олег! Меня зовут Вера, я помогаю команде «Тихой гавани» с заявками. Вы оставили заявку на ИТ-поддержку - чтобы подобрать формат, задам пару вопросов. Расскажите, чем занимается ваша компания и в каком городе вы работаете?"
+    },
+    {
+      "author": "lead",
+      "text": "Да отстаньте вы уже со своими вопросами, достали! Тупой бот!"
+    }
+  ],
+  "trusted_facts": {},
+  "offered_slots": [],
+  "meeting": null,
+  "expected_action": "manual_review",
+  "expected_facts": {
+    "service": null,
+    "monthly_revenue": null,
+    "role": null,
+    "is_owner": null,
+    "city": null
+  },
+  "expected_fact_parts": {},
+  "expected_tool_args": {
+    "reason": "aggression"
+  },
+  "forbidden_response": [],
+  "reason": "Агрессия: escalate с reason aggression, без споров."
+}

@@ -1,0 +1,233 @@
+// Package agent - ход модели: цикл с native tool calling через OpenRouter,
+// guard и критик над текстом. Побочных эффектов нет: RunTurn возвращает
+// недоверенный Turn, применяет его детерминированный код в dialog.
+package agent
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/daniil4545/lead-qualifier/internal/config"
+	"github.com/daniil4545/lead-qualifier/internal/knowledge"
+	"github.com/daniil4545/lead-qualifier/internal/qualify"
+)
+
+// ExternalFailure - сбой вызова модели. Permanent - повтор не поможет.
+type ExternalFailure struct {
+	Kind      string
+	Message   string
+	Permanent bool
+	Status    int
+}
+
+func (f *ExternalFailure) Error() string {
+	if f.Message == "" {
+		return f.Kind
+	}
+	return f.Kind + ": " + f.Message
+}
+
+// Client - ход агента поверх OpenRouter для одного каталога.
+type Client struct {
+	cfg       config.OpenRouter
+	http      *http.Client
+	prompts   Prompts
+	knowledge knowledge.Set
+	guard     Guard
+	rules     qualify.Rules
+	location  *time.Location
+}
+
+// New собирает клиента. httpClient nil - клиент по умолчанию; таймаут
+// каждого вызова задаётся контекстом из cfg.Timeout.
+func New(cfg config.OpenRouter, catalog config.Catalog, prompts Prompts, kb knowledge.Set,
+	guard Guard, rules qualify.Rules, httpClient *http.Client) *Client {
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+	return &Client{
+		cfg: cfg, http: httpClient, prompts: prompts, knowledge: kb,
+		guard: guard, rules: rules, location: catalog.Location,
+	}
+}
+
+type message struct {
+	Role       string     `json:"role"`
+	Content    string     `json:"content"`
+	ToolCalls  []toolCall `json:"tool_calls,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+	Name       string     `json:"name,omitempty"`
+	// ReasoningDetails переотправляется как есть: без него часть провайдеров
+	// отбивает tool-цикл ошибкой 400.
+	ReasoningDetails json.RawMessage `json:"reasoning_details,omitempty"`
+}
+
+type tool struct {
+	Type     string   `json:"type"`
+	Function function `json:"function"`
+}
+
+type function struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Parameters  json.RawMessage `json:"parameters"`
+	Strict      bool            `json:"strict,omitempty"`
+}
+
+type toolCall struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	Function struct {
+		Name      string `json:"name"`
+		Arguments string `json:"arguments"`
+	} `json:"function"`
+}
+
+type provider struct {
+	RequireParameters bool   `json:"require_parameters"`
+	DataCollection    string `json:"data_collection"`
+}
+
+type responseFormat struct {
+	Type       string     `json:"type"`
+	JSONSchema jsonSchema `json:"json_schema"`
+}
+
+type jsonSchema struct {
+	Name   string          `json:"name"`
+	Strict bool            `json:"strict"`
+	Schema json.RawMessage `json:"schema"`
+}
+
+type request struct {
+	Model          string          `json:"model"`
+	Messages       []message       `json:"messages"`
+	MaxTokens      int             `json:"max_tokens"`
+	Temperature    *float64        `json:"temperature,omitempty"`
+	Tools          []tool          `json:"tools,omitempty"`
+	ResponseFormat *responseFormat `json:"response_format,omitempty"`
+	Provider       provider        `json:"provider"`
+	SessionID      string          `json:"session_id,omitempty"`
+}
+
+type response struct {
+	Choices []struct {
+		Message struct {
+			Content          string          `json:"content"`
+			ToolCalls        []toolCall      `json:"tool_calls"`
+			ReasoningDetails json.RawMessage `json:"reasoning_details"`
+		} `json:"message"`
+		FinishReason string `json:"finish_reason"`
+	} `json:"choices"`
+	Usage struct {
+		PromptTokens     int     `json:"prompt_tokens"`
+		CompletionTokens int     `json:"completion_tokens"`
+		Cost             float64 `json:"cost"`
+	} `json:"usage"`
+}
+
+// newRequest - общая часть запроса: провайдер не хранит данные, параметры
+// обязательны к поддержке, иначе strict-схема молча не применится.
+func (c *Client) newRequest(model string, messages []message, sessionID string) request {
+	zero := 0.0
+	return request{
+		Model: model, Messages: messages, MaxTokens: c.cfg.MaxCompletionTokens,
+		Temperature: &zero,
+		Provider:    provider{RequireParameters: true, DataCollection: "deny"},
+		SessionID:   sessionID,
+	}
+}
+
+// call выполняет один HTTP-вызов и декодирует ответ. Повторов внутри нет:
+// переигрыванием хода управляет dialog.
+func (c *Client) call(ctx context.Context, payload request) (response, error) {
+	if c.cfg.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.cfg.Timeout)
+		defer cancel()
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return response{}, &ExternalFailure{Kind: "openrouter_request", Message: err.Error(), Permanent: true}
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.URL, bytes.NewReader(body))
+	if err != nil {
+		return response{}, &ExternalFailure{Kind: "openrouter_request", Message: err.Error(), Permanent: true}
+	}
+	req.Header.Set("Authorization", "Bearer "+c.cfg.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+	started := time.Now()
+	resp, err := c.http.Do(req)
+	if err != nil {
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return response{}, ctx.Err()
+		}
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return response{}, &ExternalFailure{Kind: "openrouter_timeout", Message: "OpenRouter timeout"}
+		}
+		return response{}, &ExternalFailure{Kind: "openrouter_transport", Message: err.Error()}
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Warn("close OpenRouter response body", "error", err)
+		}
+	}()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		// Тело ошибки идёт в аудит решения, но не в лог: провайдер может
+		// процитировать промпт.
+		return response{}, &ExternalFailure{
+			Kind:      "openrouter_http",
+			Message:   fmt.Sprintf("OpenRouter HTTP %d: %s", resp.StatusCode, bodySnippet(resp.Body)),
+			Permanent: !retryableStatus(resp.StatusCode),
+			Status:    resp.StatusCode,
+		}
+	}
+	var decoded response
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&decoded); err != nil {
+		return response{}, &ExternalFailure{Kind: "openrouter_response", Message: "OpenRouter returned invalid JSON"}
+	}
+	slog.Debug("openrouter call", "session_id", payload.SessionID, "model", payload.Model,
+		"duration_ms", time.Since(started).Milliseconds(),
+		"prompt_tokens", decoded.Usage.PromptTokens, "completion_tokens", decoded.Usage.CompletionTokens,
+		"cost", decoded.Usage.Cost)
+	if len(decoded.Choices) == 0 {
+		return response{}, &ExternalFailure{Kind: "openrouter_response", Message: "OpenRouter returned no choices"}
+	}
+	return decoded, nil
+}
+
+// retryableStatus: 402 временный - деньги появятся после пополнения; 404 у
+// OpenRouter значит «нет провайдера сейчас», а не отсутствие ресурса. 400
+// тоже переигрывается: история хода собирается заново, и отвергнутый ответ в
+// неё уже не попадёт.
+func retryableStatus(status int) bool {
+	switch status {
+	case http.StatusBadRequest, http.StatusNotFound, http.StatusRequestTimeout, http.StatusPaymentRequired,
+		http.StatusTooManyRequests, http.StatusInternalServerError, http.StatusBadGateway,
+		http.StatusServiceUnavailable, http.StatusGatewayTimeout, 529:
+		return true
+	}
+	return false
+}
+
+func bodySnippet(body io.Reader) string {
+	raw, err := io.ReadAll(io.LimitReader(body, 512))
+	if err != nil {
+		return ""
+	}
+	return strings.Join(strings.Fields(string(raw)), " ")
+}
+
+// sessionID одинаков для всех вызовов кейса: провайдер держит один маршрут.
+func sessionID(caseID int64) string {
+	return "case:" + strconv.FormatInt(caseID, 10)
+}

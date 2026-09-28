@@ -1,0 +1,30 @@
+{
+  "id": "gen-1759650000-book",
+  "provider": "ExampleProvider",
+  "model": "example/chat-model",
+  "object": "chat.completion",
+  "created": 1759650000,
+  "choices": [
+    {
+      "logprobs": null,
+      "finish_reason": "tool_calls",
+      "native_finish_reason": "tool_calls",
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "",
+        "refusal": null,
+        "reasoning": null,
+        "tool_calls": [
+          {
+            "id": "call_book_1",
+            "index": 0,
+            "type": "function",
+            "function": {"name": "book_slot", "arguments": "{\"date\":\"2026-10-06\",\"hour\":\"12\"}"}
+          }
+        ]
+      }
+    }
+  ],
+  "usage": {"prompt_tokens": 3100, "completion_tokens": 40, "total_tokens": 3140, "cost": 0.0099}
+}

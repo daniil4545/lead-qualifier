@@ -1,0 +1,12 @@
+{
+  "id": "gen-1759650000-text",
+  "provider": "ExampleProvider",
+  "model": "example/chat-model",
+  "object": "chat.completion",
+  "created": 1759650001,
+  "choices": [
+    {
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "index": 0,
