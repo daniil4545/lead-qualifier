@@ -126,7 +126,6 @@ type turnState struct {
 	criticRegen   int
 	guardRegen    int
 	claimRegen    int
-	truncated     bool
 	missingStreak bool
 	invalidStreak bool
 	// replyOptional - a ready code text follows the reply, and "-" instead of it is
@@ -178,10 +177,25 @@ func (s *turnState) step() (bool, error) {
 		return false, err
 	}
 	choice := resp.Choices[0].Message
-	dash := dashOnlyReply(choice.Content)
+	// finish_reason "length": the completion hit the token cap, and the text is empty or cut
+	// short. A stump is not a reply: it never reaches the critic and never enters the history
+	// (a cut-off reasoning block makes the next request invalid). It takes the path of an empty
+	// answer: one repeat, then the technical outcome empty_content.
+	if resp.Choices[0].FinishReason == "length" {
+		slog.Warn("agent answer truncated by token cap", "case_id", s.input.Case.ID, "calls", s.calls,
+			"completion_tokens", resp.Usage.CompletionTokens, "max_completion_tokens", s.client.cfg.MaxCompletionTokens)
+		if len(choice.ToolCalls) == 0 {
+			choice.Content = ""
+			choice.ReasoningDetails = nil
+		}
+	}
+	// A lone hyphen is the model declining to write text; sometimes it appends one to a real text
+	// as a separate line, and before the window list that read as an empty bullet.
+	cleaned := dropDashLines(choice.Content)
+	dash := dashOnlyReply(choice.Content) || (cleaned == "" && strings.TrimSpace(choice.Content) != "")
 	candidate := ""
 	if !dash {
-		candidate = strings.TrimSpace(choice.Content)
+		candidate = cleaned
 	}
 	// We do not put an empty turn into history: without content it makes the next
 	// request invalid for some providers.

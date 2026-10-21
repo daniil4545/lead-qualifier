@@ -113,6 +113,19 @@ func dashOnlyReply(text string) bool {
 	return trimmed == "-" || trimmed == "–" || trimmed == "—"
 }
 
+// dropDashLines removes lines that consist of a single hyphen. The rest may be empty: that is
+// the same refusal to write text as dashOnlyReply.
+func dropDashLines(text string) string {
+	lines := strings.Split(text, "\n")
+	kept := lines[:0]
+	for _, line := range lines {
+		if !dashOnlyReply(line) {
+			kept = append(kept, line)
+		}
+	}
+	return strings.TrimSpace(strings.Join(kept, "\n"))
+}
+
 // clockPattern - the book_slot time: strictly HH:MM or a bare hour.
 var clockPattern = regexp.MustCompile(`^(\d{1,2})(?::(\d{2}))?$`)
 

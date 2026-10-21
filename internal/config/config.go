@@ -36,7 +36,7 @@ const (
 	defaultOpenRouterURL = "https://openrouter.ai/api/v1/chat/completions"
 	defaultCatalogDir    = "data/example"
 	defaultTimeout       = 45 * time.Second
-	defaultMaxTokens     = 1200
+	defaultMaxTokens     = 2400
 
 	minMeetingMinutes = 15
 	maxMeetingMinutes = 24 * 60
