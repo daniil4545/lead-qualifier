@@ -33,6 +33,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          # The newest patch of the line in go.mod: govulncheck below reports fixed standard library
+          # vulnerabilities on an older patch release as findings.
+          check-latest: true
       - name: build
         run: go build ./...
       - name: vet
@@ -45,3 +48,6 @@ jobs:
           version: v2.15.0
       - name: test
         run: go test ./...
+      - name: govulncheck
+        # Pinned: the scan result depends on the tool version. go-version-file above fixes the Go toolchain.
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...

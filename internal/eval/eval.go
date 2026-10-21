@@ -92,7 +92,7 @@ func LoadFixtures(dir string) ([]Fixture, error) {
 }
 
 func loadFixture(path string) (Fixture, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304: a fixture file of the operator's catalog
 	if err != nil {
 		return Fixture{}, fmt.Errorf("read fixture %s: %w", path, err)
 	}

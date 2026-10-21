@@ -228,7 +228,7 @@ func LoadCatalog(dir string) (Catalog, error) {
 }
 
 func readJSON(path string, target any) error {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304: the path is a file of the operator's catalog directory
 	if err != nil {
 		return fmt.Errorf("read %s: %w", path, err)
 	}

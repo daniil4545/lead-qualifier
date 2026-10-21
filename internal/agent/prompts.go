@@ -41,7 +41,7 @@ func LoadPromptsFrom(promptsDir string, catalog config.Catalog, kb knowledge.Set
 		"{meeting_minutes}", fmt.Sprint(catalog.MeetingMinutes),
 	)
 	read := func(name string) (string, error) {
-		data, err := os.ReadFile(filepath.Join(promptsDir, name))
+		data, err := os.ReadFile(filepath.Join(promptsDir, name)) //nolint:gosec // G304: a file of the operator's catalog directory
 		if err != nil {
 			return "", fmt.Errorf("read prompt %s: %w", name, err)
 		}

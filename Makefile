@@ -2,7 +2,7 @@
 DATABASE_URL ?= postgres://lq:lq@localhost:55432/lq?sslmode=disable
 export DATABASE_URL
 
-.PHONY: demo demo-offline db build vet fmt-check lint test test-fast check prompteval
+.PHONY: demo demo-offline db build vet fmt-check lint vuln test test-fast check prompteval
 
 # Console demo: only OPENROUTER_API_KEY is needed. Logs go to demo.log
 # so they do not interfere with the conversation.
@@ -25,8 +25,13 @@ vet:
 fmt-check:
 	@out=$$(gofmt -l .); test -z "$$out" || { echo "gofmt needed:"; echo "$$out"; exit 1; }
 
+# gosec runs inside golangci-lint (.golangci.yml).
 lint:
 	golangci-lint run
+
+# Known vulnerabilities in the module graph and the standard library.
+vuln:
+	go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 
 # Full suite on Postgres from compose.
 test: db

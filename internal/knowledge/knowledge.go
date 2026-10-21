@@ -42,7 +42,7 @@ func Load(dir string) (Set, error) {
 		if !strings.HasSuffix(entry.Name(), ".md") {
 			return Set{}, fmt.Errorf("knowledge: only .md files are allowed, found %s", entry.Name())
 		}
-		data, err := os.ReadFile(filepath.Join(base, entry.Name()))
+		data, err := os.ReadFile(filepath.Join(base, entry.Name())) //nolint:gosec // G304: a file of the operator's catalog directory
 		if err != nil {
 			return Set{}, fmt.Errorf("read knowledge file %s: %w", entry.Name(), err)
 		}
@@ -61,7 +61,7 @@ func Load(dir string) (Set, error) {
 // LoadStopNames reads the dictionary of third-party names and brands: a line is an entry,
 // # is a comment.
 func LoadStopNames(dir string) ([]string, error) {
-	data, err := os.ReadFile(filepath.Join(dir, "stop_names.txt"))
+	data, err := os.ReadFile(filepath.Join(dir, "stop_names.txt")) //nolint:gosec // G304: a file of the operator's catalog directory
 	if err != nil {
 		return nil, fmt.Errorf("read stop names: %w", err)
 	}

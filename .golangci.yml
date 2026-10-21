@@ -1,9 +1,11 @@
 version: "2"
 
-# Default set plus two exclusions. Both are deliberate, not a way around red:
+# Default set plus gosec and two exclusions. Both are deliberate, not a way around red:
 # staticcheck QF checks rewrite readable code into shorter but not more
 # understandable; an unchecked return in test stubs is noisy and catches nothing.
 linters:
+  enable:
+    - gosec
   settings:
     staticcheck:
       checks:
@@ -24,3 +26,4 @@ linters:
       - path: _test\.go
         linters:
           - errcheck
+          - gosec # tests read fixtures by variable path and drop errors in cleanups
