@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/daniil4545/lead-qualifier/internal/config"
@@ -45,6 +46,9 @@ type Client struct {
 	guard     Guard
 	rules     qualify.Rules
 	location  *time.Location
+	// spent - the cost in USD of every response so far, an empty or failed one included: it was paid.
+	spentMu sync.Mutex
+	spent   float64
 	// meetingAlive - the catalog text about a live booking, {time} and {manager}.
 	meetingAlive string
 }
@@ -197,6 +201,7 @@ func (c *Client) call(ctx context.Context, payload request) (response, error) {
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&decoded); err != nil {
 		return response{}, &ExternalFailure{Kind: "openrouter_response", Message: "OpenRouter returned invalid JSON"}
 	}
+	c.addSpent(decoded.Usage.Cost)
 	slog.Debug("openrouter call", "session_id", payload.SessionID, "model", payload.Model,
 		"duration_ms", time.Since(started).Milliseconds(),
 		"prompt_tokens", decoded.Usage.PromptTokens, "completion_tokens", decoded.Usage.CompletionTokens,
@@ -238,4 +243,18 @@ func sessionID(caseID int64) string {
 // the time and the manager come from the database, not from the model.
 func (c *Client) MeetingAliveText(start time.Time, manager string) string {
 	return strings.NewReplacer("{time}", qualify.DateTimeText(start, c.location), "{manager}", manager).Replace(c.meetingAlive)
+}
+
+func (c *Client) addSpent(cost float64) {
+	c.spentMu.Lock()
+	defer c.spentMu.Unlock()
+	c.spent += cost
+}
+
+// Spent - the cost in USD of all model calls of this client (turns, critic, niche classifier).
+// The provider reports it in the response; a provider that does not report it gives zero.
+func (c *Client) Spent() float64 {
+	c.spentMu.Lock()
+	defer c.spentMu.Unlock()
+	return c.spent
 }

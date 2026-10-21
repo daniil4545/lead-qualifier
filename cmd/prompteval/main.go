@@ -5,9 +5,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"os"
 	"os/signal"
@@ -29,6 +31,7 @@ func main() {
 	pattern := flag.String("fixtures", "", "comma-separated globs over case_id")
 	out := flag.String("out", "", "path for the JSON report")
 	model := flag.String("model", "", "model override; empty - OPENROUTER_MODEL or catalog model")
+	maxUSD := flag.Float64("max-usd", defaultMaxUSD, "spending ceiling in USD over all model calls, checked before every turn; exit code 3 when reached")
 	flag.Parse()
 
 	// Turn logs go to stderr only from warnings: the report is read on stdout.
@@ -36,9 +39,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	options := options{catalogDir: *catalogDir, dir: *dir, prompts: *prompts, runs: *runs,
-		pattern: *pattern, out: *out, model: *model}
+		pattern: *pattern, out: *out, model: *model, maxUSD: *maxUSD}
 	if err := run(ctx, options); err != nil {
 		fmt.Fprintln(os.Stderr, "prompteval:", err)
+		if errors.Is(err, errBudgetCeiling) {
+			os.Exit(3)
+		}
 		os.Exit(1)
 	}
 }
@@ -47,11 +53,22 @@ type options struct {
 	catalogDir, dir, prompts string
 	runs                     int
 	pattern, out, model      string
+	maxUSD                   float64
 }
+
+// defaultMaxUSD - the default spending ceiling: a run of the whole catalog should cost cents,
+// and a loop in a prompt change should not cost dollars.
+const defaultMaxUSD = 2.0
+
+// errBudgetCeiling - the run stopped on -max-usd; the report covers what was done.
+var errBudgetCeiling = errors.New("spending ceiling reached")
 
 func run(ctx context.Context, opts options) error {
 	if opts.runs < 1 {
 		return fmt.Errorf("-n must be at least 1")
+	}
+	if opts.maxUSD <= 0 || math.IsNaN(opts.maxUSD) || math.IsInf(opts.maxUSD, 0) {
+		return fmt.Errorf("-max-usd must be a positive number")
 	}
 	catalog, err := config.LoadCatalog(opts.catalogDir)
 	if err != nil {
@@ -79,9 +96,14 @@ func run(ctx context.Context, opts options) error {
 		return err
 	}
 	results := make([]fixtureRuns, 0, len(fixtures))
+	budgetStop := false
 	for index, fixture := range fixtures {
 		entry := fixtureRuns{caseID: fixture.CaseID, class: fixture.Class, action: fixture.ExpectedAction}
 		for attempt := 1; attempt <= opts.runs; attempt++ {
+			if client.Spent() >= opts.maxUSD {
+				budgetStop = true
+				break
+			}
 			turn, err := client.RunTurn(ctx, fixture.DecisionInput(int64(index+1)))
 			if ctx.Err() != nil {
 				return ctx.Err()
@@ -97,15 +119,25 @@ func run(ctx context.Context, opts options) error {
 			issues := eval.Evaluate(fixture, turn)
 			entry.runs = append(entry.runs, newRunResult(eval.Action(turn), issues))
 		}
-		results = append(results, entry)
+		if len(entry.runs) > 0 {
+			results = append(results, entry)
+		}
+		if budgetStop {
+			break
+		}
 	}
 	report := aggregate(reportMeta{model: cfg.Model, prompts: promptsLabel(opts), runs: opts.runs,
-		timestamp: time.Now().UTC().Format(time.RFC3339)}, results)
+		timestamp: time.Now().UTC().Format(time.RFC3339),
+		costUSD:   client.Spent(), maxUSD: opts.maxUSD, budgetStop: budgetStop}, results)
 	fmt.Print(renderTable(report))
 	if opts.out != "" {
 		if err := writeReport(opts.out, report); err != nil {
 			return err
 		}
+	}
+	if budgetStop {
+		return fmt.Errorf("%w: $%.4f of $%.2f, %d of %d fixtures done", errBudgetCeiling,
+			report.CostUSD, report.MaxUSD, len(results), len(fixtures))
 	}
 	// The "no technical failures" criterion: a run with a failed transport does not
 	// measure the prompt, and CI must see that.

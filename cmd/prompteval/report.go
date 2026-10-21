@@ -42,6 +42,8 @@ type fixtureRuns struct {
 type reportMeta struct {
 	model, prompts, timestamp string
 	runs                      int
+	costUSD, maxUSD           float64
+	budgetStop                bool
 }
 
 // FixtureStat - the summary of one fixture.
@@ -71,14 +73,20 @@ type Report struct {
 	Flaky        int     `json:"flaky"`
 	CallsPerTurn float64 `json:"calls_per_turn"`
 	// TransportErrors - the number of runs of class transport_error.
-	TransportErrors int            `json:"transport_errors"`
-	ClassCounts     map[string]int `json:"class_counts"`
-	Stats           []FixtureStat  `json:"stats"`
+	TransportErrors int `json:"transport_errors"`
+	// CostUSD - the cost of all model calls of the run; MaxUSD - the ceiling. BudgetStop - the run
+	// ended on the ceiling, and the numbers cover only the turns made before it.
+	CostUSD     float64        `json:"cost_usd"`
+	MaxUSD      float64        `json:"max_usd"`
+	BudgetStop  bool           `json:"budget_stop,omitempty"`
+	ClassCounts map[string]int `json:"class_counts"`
+	Stats       []FixtureStat  `json:"stats"`
 }
 
 func aggregate(meta reportMeta, data []fixtureRuns) Report {
 	report := Report{Model: meta.model, Prompts: meta.prompts, Timestamp: meta.timestamp, Runs: meta.runs,
-		Fixtures: len(data), ClassCounts: map[string]int{}}
+		Fixtures: len(data), ClassCounts: map[string]int{},
+		CostUSD: meta.costUSD, MaxUSD: meta.maxUSD, BudgetStop: meta.budgetStop}
 	passSum, unsafeFixtures, calls, turns := 0.0, 0, 0, 0
 	for _, fixture := range data {
 		stat := fixtureStat(fixture)
@@ -166,7 +174,12 @@ func renderTable(r Report) string {
 	fmt.Fprintf(&b, "unsafe rate:      %.2f\n", r.UnsafeRate)
 	fmt.Fprintf(&b, "always/flaky/never: %d/%d/%d\n", r.AlwaysPass, r.Flaky, r.AlwaysFail)
 	fmt.Fprintf(&b, "calls per turn:   %.1f\n", r.CallsPerTurn)
-	fmt.Fprintf(&b, "%s runs: %d\n\n", ClassTransport, r.TransportErrors)
+	fmt.Fprintf(&b, "%s runs: %d\n", ClassTransport, r.TransportErrors)
+	fmt.Fprintf(&b, "cost:             $%.4f of $%.2f ceiling\n", r.CostUSD, r.MaxUSD)
+	if r.BudgetStop {
+		b.WriteString("STOPPED on the spending ceiling: the numbers cover the turns made so far only\n")
+	}
+	b.WriteString("\n")
 	fmt.Fprintf(&b, "%-28s %-22s %-14s %5s %6s  %s\n", "case", "class", "action", "pass", "unsafe", "fail mode / sample")
 	for _, stat := range r.Stats {
 		note := stat.Sample
