@@ -16,8 +16,8 @@ import (
 
 var databaseSeq atomic.Int64
 
-// openStore - интеграционный ярус: своя база на тест в Postgres из DATABASE_URL
-// (Makefile, docker-compose.yml). Под -short тест пропускается.
+// openStore - the integration tier: a database per test in Postgres from DATABASE_URL
+// (Makefile, docker-compose.yml). Under -short the test is skipped.
 func openStore(t *testing.T) *Store {
 	t.Helper()
 	if testing.Short() {
@@ -55,7 +55,7 @@ func openStore(t *testing.T) *Store {
 
 var testNow = time.Date(2026, time.October, 5, 3, 0, 0, 0, time.UTC)
 
-// newCase заводит лида и кейс в сборе; приветствие уже доставлено.
+// newCase creates a lead and a case in collection; the greeting is already delivered.
 func newCase(t *testing.T, s *Store, peer string) int64 {
 	t.Helper()
 	ctx := context.Background()
@@ -77,7 +77,7 @@ func newCase(t *testing.T, s *Store, peer string) int64 {
 	}
 }
 
-// pendingInput - реплика лида и снимок кейса для хода.
+// pendingInput - the lead's message and the case snapshot for a turn.
 func pendingInput(t *testing.T, s *Store, peer, text string) qualify.DecisionInput {
 	t.Helper()
 	ctx := context.Background()
@@ -100,7 +100,7 @@ func reply(text string) Plan {
 	return Plan{Reply: &Reply{Purpose: "reply", Text: text}}
 }
 
-// moveTo переводит кейс в статус решением на новую реплику лида.
+// moveTo moves a case to a status by a decision on a new lead message.
 func moveTo(t *testing.T, s *Store, peer string, status qualify.Status, facts qualify.Facts) int64 {
 	t.Helper()
 	input := pendingInput(t, s, peer, "реплика перед решением")
@@ -119,7 +119,7 @@ func loadCase(t *testing.T, s *Store, caseID int64) qualify.DecisionInput {
 	return input
 }
 
-// drainOutbox забирает все строки доставки и отмечает их отправленными.
+// drainOutbox takes all delivery rows and marks them sent.
 func drainOutbox(t *testing.T, s *Store) []OutboxItem {
 	t.Helper()
 	ctx := context.Background()
@@ -148,8 +148,8 @@ func claimNext(t *testing.T, s *Store) (int64, bool) {
 	return c.ID, ok
 }
 
-// Входящее по статусу: живой кейс встаёт в очередь хода, закрытый копит
-// сообщение молча, отказ возвращается в сбор с прежними фактами.
+// Incoming message by status: a live case is queued for a turn, a closed one accumulates
+// the message silently, a refusal returns to collection with the previous facts.
 func TestIngest_ByStatus(t *testing.T) {
 	t.Parallel()
 	facts := qualify.Facts{qualify.FactCity: "Томск"}
@@ -208,8 +208,8 @@ func TestIngest_UnknownPeer(t *testing.T) {
 	}
 }
 
-// Двойную бронь держит база: второе решение на то же окно менеджера
-// откатывается целиком, ответ лиду не ставится.
+// A double booking is held by the database: a second decision on the same manager window
+// rolls back entirely, no reply to the lead is queued.
 func TestApplyDecision_DoubleBooking(t *testing.T) {
 	t.Parallel()
 	s := openStore(t)
@@ -259,7 +259,7 @@ func TestApplyDecision_DoubleBooking(t *testing.T) {
 	}
 }
 
-// Повтор решения на тот же вход отбивается и не ставит вторую строку outbox.
+// A repeated decision on the same input is rejected and adds no second outbox row.
 func TestApplyDecision_RepeatIsRejected(t *testing.T) {
 	t.Parallel()
 	s := openStore(t)
@@ -280,7 +280,7 @@ func TestApplyDecision_RepeatIsRejected(t *testing.T) {
 	}
 }
 
-// Реплика, пришедшая во время хода, делает решение устаревшим.
+// A message arriving during a turn makes the decision stale.
 func TestApplyDecision_StaleInput(t *testing.T) {
 	t.Parallel()
 	s := openStore(t)
@@ -311,8 +311,8 @@ func TestApplyDecision_FrozenCase(t *testing.T) {
 	}
 }
 
-// Строка, брошенная с истёкшей арендой, возвращается в выборку; доставку
-// фиксирует только последний захват, и сообщение попадает в историю один раз.
+// A row abandoned with an expired lease returns to the selection; delivery is
+// recorded only by the last claim, and the message enters the history once.
 func TestOutbox_RedeliveryAfterLeaseExpiry(t *testing.T) {
 	t.Parallel()
 	s := openStore(t)
@@ -363,8 +363,8 @@ func TestOutbox_RedeliveryAfterLeaseExpiry(t *testing.T) {
 	}
 }
 
-// Вторая бронь того же кейса упирается в индекс кейса, а не окна: это не
-// «окно заняли», решение откатывается, прежняя бронь остаётся.
+// A second booking of the same case hits the case index, not the window one: this is not
+// "window taken", the decision rolls back, the previous booking stays.
 func TestApplyDecision_SecondBookingOfCase(t *testing.T) {
 	t.Parallel()
 	s := openStore(t)

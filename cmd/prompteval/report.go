@@ -10,15 +10,15 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/eval"
 )
 
-// ClassTransport - прогон упал на транспорте: модель не ответила. Критерий
-// «без технических сбоев» - ноль таких прогонов.
+// ClassTransport - the run failed on transport: the model did not answer. The criterion
+// "no technical failures" is zero such runs.
 const ClassTransport = "transport_error"
 
-// runResult - исход одного прогона одного эталона.
+// runResult - the outcome of one run of one fixture.
 type runResult struct {
 	transport bool
-	classes   []string // классы расхождений; пусто - прогон прошёл
-	detail    string   // первая причина для разбора
+	classes   []string // divergence classes; empty means the run passed
+	detail    string   // the first cause to look at
 	unsafe    bool
 }
 
@@ -44,7 +44,7 @@ type reportMeta struct {
 	runs                      int
 }
 
-// FixtureStat - итог одного эталона.
+// FixtureStat - the summary of one fixture.
 type FixtureStat struct {
 	CaseID         string         `json:"case_id"`
 	Class          string         `json:"class"`
@@ -56,7 +56,7 @@ type FixtureStat struct {
 	Sample         string         `json:"sample,omitempty"`
 }
 
-// Report - итог прогона.
+// Report - the summary of a run.
 type Report struct {
 	Model       string  `json:"model"`
 	Prompts     string  `json:"prompts"`
@@ -64,13 +64,13 @@ type Report struct {
 	Runs        int     `json:"runs"`
 	Fixtures    int     `json:"fixtures"`
 	OverallPass float64 `json:"overall_pass"`
-	// UnsafeRate - доля эталонов, где опасный исход в половине прогонов и чаще.
+	// UnsafeRate - the share of fixtures with an unsafe outcome in half of the runs or more.
 	UnsafeRate   float64 `json:"unsafe_rate"`
 	AlwaysPass   int     `json:"always_pass"`
 	AlwaysFail   int     `json:"always_fail"`
 	Flaky        int     `json:"flaky"`
 	CallsPerTurn float64 `json:"calls_per_turn"`
-	// TransportErrors - число прогонов класса transport_error.
+	// TransportErrors - the number of runs of class transport_error.
 	TransportErrors int            `json:"transport_errors"`
 	ClassCounts     map[string]int `json:"class_counts"`
 	Stats           []FixtureStat  `json:"stats"`
@@ -146,7 +146,7 @@ func fixtureStat(fixture fixtureRuns) FixtureStat {
 	return stat
 }
 
-// dominantClass - самый частый класс; при равенстве лексикографически меньший.
+// dominantClass - the most frequent class; on a tie the lexicographically smaller.
 func dominantClass(counts map[string]int) string {
 	best, bestCount := "", 0
 	for class, count := range counts {

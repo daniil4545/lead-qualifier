@@ -11,7 +11,7 @@ import (
 
 var zone = time.FixedZone("UTC+7", 7*3600)
 
-// local - момент по местному времени каталога; 5 октября 2026 - понедельник.
+// local - a moment in the catalog's local time; October 5, 2026 is a Monday.
 func local(day, hour, minute int) time.Time {
 	return time.Date(2026, time.October, day, hour, minute, 0, 0, zone)
 }
@@ -21,8 +21,8 @@ func newCalendar(t *testing.T, managers ...config.Manager) *Local {
 	return newCalendarWith(t, "10:00", "18:00", 60, managers...)
 }
 
-// newCalendarWith - календарь с общими часами open-close по будням и встречей
-// заданной длины.
+// newCalendarWith - a calendar with common hours open-close on weekdays and a meeting
+// of the given length.
 func newCalendarWith(t *testing.T, open, closing string, minutes int, managers ...config.Manager) *Local {
 	t.Helper()
 	hours := config.WorkHours{}
@@ -46,7 +46,7 @@ func busyAt(start time.Time) []Interval {
 	return []Interval{{Start: start, End: start.Add(time.Hour)}}
 }
 
-// Менеджер: самое раннее окно, при равенстве меньший Priority, затем id.
+// Manager: the earliest window, on a tie the smaller Priority, then id.
 func TestOffer_ManagerChoice(t *testing.T) {
 	t.Parallel()
 	now := local(5, 7, 30)
@@ -90,7 +90,7 @@ func TestAvailable(t *testing.T) {
 		busy   Busy
 		now    time.Time
 		start  time.Time
-		wantID string // пусто - окна нет
+		wantID string // empty means no window
 	}{
 		{"free hour goes to priority", nil, now, local(5, 12, 0), "a"},
 		{"busy manager passes to next", Busy{"a": busyAt(local(5, 12, 0))}, now, local(5, 12, 0), "b"},
@@ -115,14 +115,14 @@ func TestAvailable(t *testing.T) {
 	}
 }
 
-// Сетка окон: первое окно - начало рабочего дня, шаг - длительность встречи,
-// последнее окно заканчивается не позже конца дня.
+// Window grid: the first window is the start of the working day, the step is the meeting duration,
+// the last window ends no later than the end of the day.
 func TestOffer_GridFromOpeningByMeetingLength(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		open, closing string
 		minutes       int
-		first, last   time.Time // первое и последнее начало в понедельник
+		first, last   time.Time // first and last start on Monday
 	}{
 		{"09:30", "17:30", 30, local(5, 9, 30), local(5, 17, 0)},
 		{"10:00", "18:00", 60, local(5, 10, 0), local(5, 17, 0)},

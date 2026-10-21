@@ -13,18 +13,18 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/qualify"
 )
 
-// uniqueViolation - код Postgres нарушения уникального индекса; slotIndex -
-// индекс окна менеджера. Второй индекс брони (одна на кейс) занятым окном не
-// является: это ошибка кода, а не гонка лидов.
+// uniqueViolation - the Postgres code for a unique index violation; slotIndex is
+// the manager window index. The second booking index (one per case) is not a taken
+// window: that is a code error, not a race between leads.
 const (
 	uniqueViolation = "23505"
 	slotIndex       = "meetings_slot_idx"
 )
 
-// ApplyDecision применяет решение хода одной транзакцией: реплики блока
-// помечаются обработанными, решение и проекция кейса пишутся, бронь и
-// действия наружу ставятся в outbox. lastIncomingID - последняя реплика
-// блока, на который отвечал ход.
+// ApplyDecision applies a turn decision in one transaction: the block's messages
+// are marked processed, the decision and case projection are written, the booking and
+// outward actions are put into the outbox. lastIncomingID is the last message
+// of the block the turn answered.
 func (s *Store) ApplyDecision(ctx context.Context, caseID, lastIncomingID int64, decision Decision, plan Plan) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -74,8 +74,8 @@ func (s *Store) ApplyDecision(ctx context.Context, caseID, lastIncomingID int64,
 	return nil
 }
 
-// markBlockProcessed помечает блок реплик до lastIncomingID. Реплика новее
-// блока значит, что ход отвечал не на всё: решение отбраковывается.
+// markBlockProcessed marks the block of messages up to lastIncomingID. A message newer than the
+// block means the turn did not answer everything: the decision is rejected.
 func markBlockProcessed(ctx context.Context, tx pgx.Tx, caseID, lastIncomingID int64) error {
 	var newer int64
 	if err := tx.QueryRow(ctx, `
@@ -124,8 +124,8 @@ func insertDecision(ctx context.Context, tx pgx.Tx, caseID int64, decision Decis
 	return id, nil
 }
 
-// applyPlan пишет эффекты решения. Порядок важен: сначала гасится очередь и
-// снимается бронь, потом ставится новое - прощание уходит, стоявшее до него нет.
+// applyPlan writes the decision effects. Order matters: first the queue is cleared and
+// the booking cancelled, then the new one is put in - the farewell goes out, what stood before it does not.
 func applyPlan(ctx context.Context, tx pgx.Tx, caseID int64, causeKey string, plan Plan) error {
 	if plan.CancelOutbox {
 		tag, err := tx.Exec(ctx, `
@@ -176,8 +176,8 @@ func applyPlan(ctx context.Context, tx pgx.Tx, caseID int64, causeKey string, pl
 	return nil
 }
 
-// insertBooking пишет бронь. Занятое окно менеджера отбивает уникальный индекс,
-// и вся транзакция решения откатывается.
+// insertBooking writes the booking. A busy manager window is rejected by the unique index,
+// and the whole decision transaction rolls back.
 func insertBooking(ctx context.Context, tx pgx.Tx, caseID int64, booking qualify.Meeting) error {
 	var id int64
 	err := tx.QueryRow(ctx, `

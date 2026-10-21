@@ -14,7 +14,7 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/qualify"
 )
 
-// Terminal - чем закончился ход. TerminalNone - обычный ответ лиду.
+// Terminal - how the turn ended. TerminalNone - an ordinary reply to the lead.
 type Terminal int
 
 const (
@@ -40,27 +40,27 @@ func (t Terminal) String() string {
 	return fmt.Sprint(int(t))
 }
 
-// Turn - результат хода. Недоверенный: dialog проверяет его и применяет.
+// Turn - the result of a turn. Untrusted: dialog validates it and applies it.
 type Turn struct {
 	FinalText string
 	Facts     qualify.Facts
 	Terminal  Terminal
-	// Reason - причина терминала: escalate:<reason>, lead_opt_out, lead_refused,
-	// guard, critic_regen_limit, incomplete_complete и технические из
+	// Reason - the terminal reason: escalate:<reason>, lead_opt_out, lead_refused,
+	// guard, critic_regen_limit, incomplete_complete and the technical ones from
 	// TechnicalReasons.
 	Reason string
-	// FactsChanged - ход реально изменил факты лида: гейт обязан пересчитаться.
+	// FactsChanged - the turn really changed the lead's facts: the gate must be recomputed.
 	FactsChanged bool
-	// RequestedAt - названный лидом час при TerminalBookSlot.
+	// RequestedAt - the hour the lead named, for TerminalBookSlot.
 	RequestedAt time.Time
-	// NotEarlierThan и NotLaterThan - срок лида при TerminalOfferSlots, начало
-	// дня; нулевые - срока не было.
+	// NotEarlierThan and NotLaterThan - the lead's time window for TerminalOfferSlots, start
+	// of day; zero values mean there was no limit.
 	NotEarlierThan time.Time
 	NotLaterThan   time.Time
 	Trace          Trace
 }
 
-// Trace - аудит хода для decisions.raw_response. В лог не идёт: цитаты.
+// Trace - the turn audit for decisions.raw_response. Not logged: it contains quotes.
 type Trace struct {
 	Rounds  []Round
 	KBFiles []string
@@ -69,15 +69,15 @@ type Trace struct {
 	Critic  []CriticVerdict
 }
 
-// Round - один вызов инструмента: имя, аргументы и ответ кода.
+// Round - one tool call: name, arguments and the code's answer.
 type Round struct {
 	Tool      string
 	Arguments map[string]any
 	Result    string
 }
 
-// TechnicalReasons - сбой модели, а не исход разговора: ход откладывается и
-// переигрывается, после потолка попыток кейс уходит к человеку.
+// TechnicalReasons - a model failure, not a conversation outcome: the turn is deferred and
+// replayed, and after the attempt ceiling the case goes to a human.
 var TechnicalReasons = map[string]bool{
 	"critic_error":  true,
 	"critic_budget": true,
@@ -87,25 +87,25 @@ var TechnicalReasons = map[string]bool{
 }
 
 const (
-	// maxRounds и maxCalls - потолки хода: раундов инструментов и вызовов
-	// модели вместе с критиком и перегенерациями.
+	// maxRounds and maxCalls - turn ceilings: tool rounds and model calls
+	// in total, including the critic and regenerations.
 	maxRounds = 6
 	maxCalls  = 9
-	// criticMaxRegen и guardMaxRegen - перегенерации черновика по замечаниям.
-	// Бюджеты раздельные: общий отдавал попытку критика guard.
+	// criticMaxRegen and guardMaxRegen - draft regenerations after remarks.
+	// The budgets are separate: a shared one let the critic use up the guard's attempt.
 	criticMaxRegen = 2
 	guardMaxRegen  = 2
 )
 
-// feedbackPrefix помечает замечание кода: роль у него user, как у лида, и без
-// пометки модель отвечает служебному тексту вслух.
+// feedbackPrefix marks a remark from the code: its role is user, like the lead's, and without
+// the mark the model answers the service text aloud.
 const feedbackPrefix = "[служебное сообщение нашего кода, это не слова лида] "
 
-// preloadPrefix помечает выданный заранее раздел базы по той же причине.
+// preloadPrefix marks a knowledge base section issued in advance, for the same reason.
 const preloadPrefix = "[выдержка из базы знаний, выдана заранее нашим кодом, это не слова лида]"
 
-// turnState - состояние одного хода. Методы - шаги цикла; разобраны на
-// отдельные функции, чтобы каждое правило читалось рядом со своей веткой.
+// turnState - the state of one turn. The methods are the loop steps; split into
+// separate functions so each rule reads next to its own branch.
 type turnState struct {
 	client    *Client
 	ctx       context.Context
@@ -122,16 +122,16 @@ type turnState struct {
 	guardRegen    int
 	missingStreak bool
 	invalidStreak bool
-	// replyOptional - за репликой идёт готовый текст кода, и «-» вместо неё
-	// штатный исход. replyRequested - код реплику попросил.
+	// replyOptional - a ready code text follows the reply, and "-" instead of it is
+	// a normal outcome. replyRequested - the code asked for a reply.
 	replyOptional  bool
 	replyRequested bool
 }
 
-// RunTurn исполняет один ход: вызовы модели с инструментами, пока она не
-// ответит текстом или не вызовет завершающий инструмент. Каждый черновик
-// проходит guard и критика. Ошибка - внешний сбой; Turn при ней несёт только
-// собранные факты и аудит.
+// RunTurn executes one turn: model calls with tools until it
+// answers with text or calls a terminal tool. Every draft
+// passes the guard and the critic. An error is an external failure; on it Turn carries only
+// the collected facts and the audit.
 func (c *Client) RunTurn(ctx context.Context, input qualify.DecisionInput) (Turn, error) {
 	messages, err := c.buildMessages(input)
 	if err != nil {
@@ -159,7 +159,7 @@ func (c *Client) RunTurn(ctx context.Context, input qualify.DecisionInput) (Turn
 	return state.turn, nil
 }
 
-// step - один вызов модели и разбор ответа. true - ход окончен.
+// step - one model call and parsing of the answer. true means the turn is over.
 func (s *turnState) step() (bool, error) {
 	s.calls++
 	req := s.client.newRequest(s.client.cfg.Model, s.messages, sessionID(s.input.Case.ID))
@@ -176,8 +176,8 @@ func (s *turnState) step() (bool, error) {
 	if !dash {
 		candidate = strings.TrimSpace(choice.Content)
 	}
-	// Пустой ход в историю не кладём: без содержимого он делает следующий
-	// запрос невалидным у части провайдеров.
+	// We do not put an empty turn into history: without content it makes the next
+	// request invalid for some providers.
 	if candidate != "" || len(choice.ToolCalls) > 0 {
 		s.messages = append(s.messages, message{Role: "assistant", Content: choice.Content,
 			ToolCalls: choice.ToolCalls, ReasoningDetails: choice.ReasoningDetails})
@@ -188,7 +188,7 @@ func (s *turnState) step() (bool, error) {
 	return s.handleTool(choice.ToolCalls)
 }
 
-// handleText - модель ответила текстом: пустой ответ, guard, критик.
+// handleText - the model answered with text: empty answer, guard, critic.
 func (s *turnState) handleText(candidate string, dash bool) (bool, error) {
 	if candidate == "" {
 		switch {
@@ -198,7 +198,7 @@ func (s *turnState) handleText(candidate string, dash bool) (bool, error) {
 			s.emptyRetried = true
 			return false, nil
 		case s.turn.Terminal != TerminalNone:
-			// Побочный эффект хода уже запланирован и уйдёт своим текстом.
+			// The side effect of the turn is already planned and will go out with its own text.
 			return true, nil
 		}
 		s.setTerminal(TerminalManualReview, "empty_content")
@@ -253,8 +253,8 @@ func (s *turnState) handleText(candidate string, dash bool) (bool, error) {
 	return false, nil
 }
 
-// rejectReply - черновик не прошёл проверку. Где у кода есть свой текст,
-// ход теряет только реплику; иначе лид остался бы без ответа - к человеку.
+// rejectReply - the draft failed a check. Where the code has its own text,
+// the turn loses only the reply; otherwise the lead would be left without an answer, so it goes to a human.
 func (s *turnState) rejectReply(cause string) {
 	if s.replyOptional {
 		slog.Warn("agent reply dropped", "case_id", s.input.Case.ID, "reason", cause)
@@ -263,8 +263,8 @@ func (s *turnState) rejectReply(cause string) {
 	s.setTerminal(TerminalManualReview, cause)
 }
 
-// regenerate просит переписать черновик без инструментов: набор фрагментов
-// базы уже зафиксирован.
+// regenerate asks for a rewrite of the draft without tools: the set of knowledge base
+// fragments is already fixed.
 func (s *turnState) regenerate(categories []string) {
 	s.noTools = true
 	s.messages = append(s.messages, message{Role: "user", Content: feedback(categories)})
@@ -275,8 +275,8 @@ func (s *turnState) setTerminal(terminal Terminal, reason string) {
 	s.turn.Reason = reason
 }
 
-// handleTool исполняет первый инструмент ответа. Лишние получают ошибку: у
-// части провайдеров каждый tool_call обязан получить ответ.
+// handleTool executes the first tool of the answer. The extra ones get an error: some
+// providers require every tool_call to get an answer.
 func (s *turnState) handleTool(calls []toolCall) (bool, error) {
 	call := calls[0]
 	name, args := call.Function.Name, call.Function.Arguments
@@ -297,7 +297,7 @@ func (s *turnState) handleTool(calls []toolCall) (bool, error) {
 	return false, nil
 }
 
-// execute - ветка инструмента. Возвращает ответ модели и признак конца хода.
+// execute - the tool branch. Returns the model's answer and the end-of-turn flag.
 func (s *turnState) execute(name, args string) (string, bool, error) {
 	if name != "complete" {
 		s.missingStreak = false
@@ -335,7 +335,7 @@ func (s *turnState) execute(name, args string) (string, bool, error) {
 		s.setTerminal(TerminalRefuse, "lead_refused")
 		return "refuse", true, nil
 	}
-	// Имя вне контракта в лог не пишем: это сырой вывод модели.
+	// A name outside the contract is not logged: it is raw model output.
 	slog.Warn("unknown tool", "case_id", s.input.Case.ID)
 	return "unknown tool", false, nil
 }
@@ -365,8 +365,8 @@ func (s *turnState) searchKB(args string) string {
 	return builder.String()
 }
 
-// saveFacts проверяет значения до применения снимка. Второй невалидный вызов
-// подряд - технический сбой хода.
+// saveFacts validates the values before the snapshot is applied. A second invalid call
+// in a row is a technical failure of the turn.
 func (s *turnState) saveFacts(args string) (string, bool) {
 	var wire struct {
 		Facts qualify.FactDelta `json:"facts"`
@@ -389,8 +389,8 @@ func (s *turnState) saveFacts(args string) (string, bool) {
 	return "ok", false
 }
 
-// complete - решение по собранным фактам: вердикт ниши, гейт и ответ с
-// решением. Вердикт считается до реплики, чтобы модель писала её под решение.
+// complete - the decision on the collected facts: niche verdict, gate and the reply with
+// the decision. The verdict is computed before the reply so the model writes it to fit the decision.
 func (s *turnState) complete() (string, bool, error) {
 	if s.turn.Terminal == TerminalOfferSlots {
 		return "времена уже запрошены вызовом offer_slots, complete не нужен: напиши реплику", false, nil
@@ -421,8 +421,8 @@ func (s *turnState) complete() (string, bool, error) {
 	return slotsReplyRequest, false, nil
 }
 
-// meetingBlocked - рубеж записи ответом инструмента: модель узнаёт причину
-// и продолжает ход. Пустая строка - можно.
+// meetingBlocked - the booking boundary as a tool answer: the model learns the reason
+// and continues the turn. An empty string means allowed.
 func (s *turnState) meetingBlocked() string {
 	switch s.client.rules.MeetingBlock(s.input.Case.Status, s.facts) {
 	case qualify.BlockMeetingScheduled:
@@ -471,12 +471,12 @@ func (s *turnState) bookSlot(args string) (string, bool) {
 	return "book_slot", true
 }
 
-// finish закрывает ход: цикл без текста и без терминала - сбой модели.
+// finish closes the turn: a loop with no text and no terminal is a model failure.
 func (s *turnState) finish() {
 	if s.turn.Terminal == TerminalNone && s.turn.FinalText == "" {
 		s.setTerminal(TerminalManualReview, "loop_limit")
 	}
-	// Реплику просили и молчать не разрешали, а своего текста у кода нет.
+	// A reply was requested and silence was not allowed, but the code has no text of its own.
 	if s.turn.Terminal == TerminalComplete && s.turn.FinalText == "" && s.replyRequested && !s.replyOptional {
 		s.setTerminal(TerminalManualReview, "empty_content")
 	}
@@ -485,8 +485,8 @@ func (s *turnState) finish() {
 	s.turn.Trace.Calls = s.calls
 }
 
-// partial - ход, оборванный внешним сбоем: факты и аудит переживают сбой,
-// решение по остальным полям принимать нельзя.
+// partial - a turn cut off by an external failure: facts and audit survive the failure,
+// the decision must not be taken from the other fields.
 func (s *turnState) partial() Turn {
 	return Turn{Facts: s.facts, Trace: Trace{Rounds: s.turn.Trace.Rounds, KBFiles: s.turn.Trace.KBFiles,
 		Calls: s.calls, Critic: s.turn.Trace.Critic}}
@@ -517,8 +517,8 @@ func (s *turnState) criticPayload(candidate string, tariffPrice int64) criticPay
 	return payload
 }
 
-// fixNotes - что исправить по категории: одна метка модели ничего не говорит,
-// и перегенерация повторяла нарушение.
+// fixNotes - what to fix per category: a single model label says nothing,
+// and regeneration repeated the violation.
 var fixNotes = map[string]string{
 	"invented_fact": "Черновик называет факт, которого нет в выданных фрагментах базы: убери его " +
 		"и предложи разобрать вопрос на встрече. Уточнить и вернуться с ответом не обещай. ",

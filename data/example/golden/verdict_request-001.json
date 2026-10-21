@@ -42,5 +42,5 @@
   "expected_fact_parts": {},
   "expected_tool_args": {},
   "forbidden_response": [],
-  "reason": "Все пять фактов уже собраны, лид спрашивает решение: complete, судит код."
+  "reason": "All five facts are already collected and the lead asks for the decision: complete, the code judges."
 }

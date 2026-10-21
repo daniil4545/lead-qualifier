@@ -14,8 +14,8 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/qualify"
 )
 
-// Второй каталог без правки кода: один сценарий по обоим каталогам, все
-// пороги, цены, пояс и длительность встречи берутся из загруженного каталога.
+// A second catalog without code changes: one scenario over both catalogs, all
+// thresholds, prices, time zone and meeting duration come from the loaded catalog.
 func TestCatalogGenerality(t *testing.T) {
 	t.Parallel()
 	for _, dir := range []string{exampleCatalog, "../../testdata/catalog-alt"} {
@@ -49,7 +49,7 @@ func maxTariffThreshold(catalog config.Catalog) int64 {
 	return most
 }
 
-// catalogFacts - полный набор фактов лида с выручкой и вердиктом ниши.
+// catalogFacts - a full set of the lead's facts with revenue and the niche verdict.
 func catalogFacts(rules qualify.Rules, revenue int64, verdict qualify.NicheVerdict) qualify.Facts {
 	s := func(v string) *string { return &v }
 	owner := true
@@ -59,7 +59,7 @@ func catalogFacts(rules qualify.Rules, revenue int64, verdict qualify.NicheVerdi
 	return facts
 }
 
-// Тариф по выручке: порог включительный, ниже порога - предыдущий тариф или никакого.
+// Tariff by revenue: the threshold is inclusive, below it is the previous tariff or none.
 func checkTariffs(t *testing.T, catalog config.Catalog) {
 	rules := qualify.NewRules(catalog)
 	tariffs := slices.Clone(catalog.Tariffs)
@@ -85,8 +85,8 @@ func checkTariffs(t *testing.T, catalog config.Catalog) {
 	}
 }
 
-// База каталога проходит lint по его ценам, ссылкам и стоп-словарю, промпты
-// собираются с его компанией.
+// The catalog base passes lint on its prices, links and stop dictionary, the prompts
+// are built with its company.
 func checkKnowledge(t *testing.T, dir string, catalog config.Catalog) {
 	kb, err := knowledge.Load(dir)
 	if err != nil {
@@ -118,8 +118,8 @@ type gateRow struct {
 	wantText   string
 }
 
-// Гейт на пороге каждого сегмента: порог сегмента либо, без него, минимальный
-// порог тарифов; порог включительный. Повод отказа закрывает кейс при любой выручке.
+// The gate at the threshold of each segment: the segment threshold or, without it, the minimum
+// tariff threshold; the threshold is inclusive. A refusal reason closes the case at any revenue.
 func checkGate(t *testing.T, dir string, catalog config.Catalog) {
 	var rows []gateRow
 	for _, segment := range catalog.Segments {
@@ -155,8 +155,8 @@ func checkGate(t *testing.T, dir string, catalog config.Catalog) {
 	}
 }
 
-// tuesdayBounds - самое раннее начало и самый поздний конец вторничных часов:
-// общих и своих у менеджеров.
+// tuesdayBounds - the earliest start and the latest end of Tuesday hours:
+// common and the managers' own.
 func tuesdayBounds(t *testing.T, catalog config.Catalog) (earliest, latest time.Time) {
 	t.Helper()
 	schedules := []config.WorkHours{catalog.WorkHours}
@@ -198,9 +198,9 @@ func tuesdayWindow(t *testing.T, catalog config.Catalog, hours config.WorkHours)
 	return open, closing, true
 }
 
-// Бронь в поясе и рабочих часах каталога на длительность встречи каталога.
-// Сетка окон (решение владельца): первое окно - начало рабочего дня, шаг -
-// длительность встречи, последнее заканчивается не позже конца дня.
+// Booking in the catalog time zone and working hours for the catalog meeting duration.
+// Window grid (owner decision): the first window is the start of the working day, the step is
+// the meeting duration, the last ends no later than the end of the day.
 func checkBooking(t *testing.T, dir string, catalog config.Catalog) {
 	open, closing, ok := tuesdayWindow(t, catalog, catalog.WorkHours)
 	if !ok {

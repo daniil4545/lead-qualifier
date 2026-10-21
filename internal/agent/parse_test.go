@@ -10,9 +10,9 @@ import (
 
 const textReply = "Хорошо, спасибо за ответ."
 
-// Разбор записанных ответов OpenRouter. Битый ответ - сбой модели: ошибка
-// или техническая причина, текста лиду нет, dialog переиграет ход. Разовый
-// пустой ответ и неизвестный инструмент модель исправляет в том же ходе.
+// Parsing of recorded OpenRouter answers. A broken answer is a model failure: an error
+// or a technical reason, no text for the lead, dialog replays the turn. A one-off
+// empty answer and an unknown tool the model fixes within the same turn.
 func TestRunTurn_RecordedResponses(t *testing.T) {
 	t.Parallel()
 	fx := loadFixture(t)
@@ -22,7 +22,7 @@ func TestRunTurn_RecordedResponses(t *testing.T) {
 		name      string
 		script    []string
 		fallback  string
-		technical bool // сбой модели: ошибка хода или причина из TechnicalReasons
+		technical bool // model failure: a turn error or a reason from TechnicalReasons
 	}{
 		{"broken json", []string{"broken_json.json"}, "", true},
 		{"empty choices", []string{"empty_choices.json"}, "", true},
@@ -50,13 +50,13 @@ func TestRunTurn_RecordedResponses(t *testing.T) {
 	}
 }
 
-// Время book_slot: HH:MM либо голый час, в поясе каталога; прочее - не бронь.
+// The book_slot time: HH:MM or a bare hour, in the catalog time zone; anything else is not a booking.
 func TestParseRequestedAt(t *testing.T) {
 	t.Parallel()
 	location := time.FixedZone("UTC+2", 2*3600)
 	cases := []struct {
 		date, clock string
-		want        time.Time // нулевое - не распознано
+		want        time.Time // zero means not recognized
 	}{
 		{"2026-10-06", "9", time.Date(2026, time.October, 6, 9, 0, 0, 0, location)},
 		{"2026-10-06", "09:30", time.Date(2026, time.October, 6, 9, 30, 0, 0, location)},

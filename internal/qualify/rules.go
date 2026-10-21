@@ -7,21 +7,21 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/config"
 )
 
-// Rules - правила решения одного каталога: тарифы, сегменты ниш и поводы отказа.
-// Строится один раз при старте; все пороги и цены приходят из каталога.
+// Rules - the decision rules of one catalog: tariffs, niche segments and refusal reasons.
+// Built once at start; all thresholds and prices come from the catalog.
 type Rules struct {
-	tariffs      []config.Tariff // по возрастанию порога
+	tariffs      []config.Tariff // ascending by threshold
 	segments     map[string]config.Segment
 	reasons      map[string]config.RefusalReason
 	minThreshold int64
 	prices       map[int64]bool
 }
 
-// NicheUnclear - код неподтверждённого профиля: классификатор не разложил
-// услугу либо назвал значение вне перечня. Порог у него - минимальный тарифный.
+// NicheUnclear - the code of an unconfirmed profile: the classifier did not map the
+// service or named a value outside the list. Its threshold is the minimum tariff threshold.
 const NicheUnclear = "unclear"
 
-// NewRules собирает правила из проверенного каталога.
+// NewRules builds the rules from a validated catalog.
 func NewRules(catalog config.Catalog) Rules {
 	rules := Rules{
 		tariffs:      slices.Clone(catalog.Tariffs),
@@ -43,9 +43,9 @@ func NewRules(catalog config.Catalog) Rules {
 	return rules
 }
 
-// TariffFor - тариф лида по нижней границе выручки: цена консервативна. Порог
-// включительный. Выручка ниже минимального порога или непонятная - тарифа нет,
-// и цену бот не называет.
+// TariffFor - the lead's tariff by the lower bound of revenue: the price is conservative. The threshold
+// is inclusive. Revenue below the minimum threshold or unintelligible means no tariff,
+// and the bot does not name a price.
 func (r Rules) TariffFor(facts Facts) (config.Tariff, bool) {
 	lower, _, ok := revenueBounds(facts)
 	if !ok {
@@ -61,12 +61,12 @@ func (r Rules) TariffFor(facts Facts) (config.Tariff, bool) {
 	return found, matched
 }
 
-// IsCatalogPrice - сумма совпадает с ценой какого-либо тарифа каталога.
+// IsCatalogPrice - the amount equals the price of some catalog tariff.
 func (r Rules) IsCatalogPrice(amount int64) bool {
 	return r.prices[amount]
 }
 
-// Prices - цены всех тарифов каталога.
+// Prices - the prices of all catalog tariffs.
 func (r Rules) Prices() []int64 {
 	prices := make([]int64, 0, len(r.tariffs))
 	for _, tariff := range r.tariffs {
@@ -75,7 +75,7 @@ func (r Rules) Prices() []int64 {
 	return prices
 }
 
-// Segments и Reasons - перечни каталога для классификатора ниши.
+// Segments and Reasons - the catalog lists for the niche classifier.
 func (r Rules) Segments() []config.Segment {
 	segments := make([]config.Segment, 0, len(r.segments))
 	for _, segment := range r.segments {
@@ -94,16 +94,16 @@ func (r Rules) Reasons() []config.RefusalReason {
 	return reasons
 }
 
-// NicheVerdict - вердикт классификатора ниши. Недоверенный ввод: Go принимает
-// только коды каталога.
+// NicheVerdict - the niche classifier verdict. Untrusted input: Go accepts
+// only catalog codes.
 type NicheVerdict struct {
 	Direction        string
 	OffProfileReason string
 }
 
-// NormalizeVerdict приводит вердикт к кодам каталога. Направление вне перечня -
-// сбой классификатора, а не решение: повод отказа при нём не действует, цена
-// ошибки классификатора - встреча, а не потерянный лид.
+// NormalizeVerdict brings the verdict to catalog codes. A direction outside the list is a
+// classifier failure, not a decision: the refusal reason is not in force then, and the cost of
+// a classifier error is a meeting, not a lost lead.
 func (r Rules) NormalizeVerdict(verdict NicheVerdict) (direction, reason string) {
 	_, known := r.segments[verdict.Direction]
 	switch {
@@ -120,8 +120,8 @@ func (r Rules) NormalizeVerdict(verdict NicheVerdict) (direction, reason string)
 	return direction, reason
 }
 
-// ApplyVerdict кладёт нормализованный вердикт в факты, привязав его к текущей
-// услуге: поправка услуги лидом делает вердикт устаревшим.
+// ApplyVerdict puts the normalized verdict into the facts, binding it to the current
+// service: the lead correcting the service makes the verdict stale.
 func (r Rules) ApplyVerdict(facts Facts, verdict NicheVerdict) {
 	direction, reason := r.NormalizeVerdict(verdict)
 	facts[factNiche] = direction
@@ -133,15 +133,15 @@ func (r Rules) ApplyVerdict(facts Facts, verdict NicheVerdict) {
 	}
 }
 
-// NicheKnown - вердикт посчитан для текущей услуги. Без него гейт пропустил бы
-// любого, поэтому окна до классификации не предлагаются.
+// NicheKnown - the verdict is computed for the current service. Without it the gate would pass
+// anyone, so windows are not offered before classification.
 func NicheKnown(facts Facts) bool {
 	service := facts.Value(FactService)
 	return service == "" || facts.Value(factNicheOf) == NormalizeText(service)
 }
 
-// Segment - направление лида и повод отказа. Повод действует, только если
-// целевого направления нет: смесь решается в пользу встречи.
+// Segment - the lead's direction and the refusal reason. The reason applies only if
+// there is no target direction: a mix is resolved in favor of a meeting.
 func (r Rules) Segment(facts Facts) (segment, offReason string) {
 	code := facts.Value(factNiche)
 	_, target := r.segments[code]
@@ -154,7 +154,7 @@ func (r Rules) Segment(facts Facts) (segment, offReason string) {
 	return code, ""
 }
 
-// Mixed - лид назвал и нецелевую нишу, и целевое направление.
+// Mixed - the lead named both a non-target niche and a target direction.
 func (r Rules) Mixed(facts Facts) bool {
 	if facts.Value(factNicheOff) == "" {
 		return false
@@ -163,7 +163,7 @@ func (r Rules) Mixed(facts Facts) bool {
 	return target
 }
 
-// SegmentName и ReasonName - человекочитаемые имена для заметок менеджеру.
+// SegmentName and ReasonName - human-readable names for manager notes.
 func (r Rules) SegmentName(code string) string {
 	if segment, ok := r.segments[code]; ok {
 		return segment.Name
@@ -178,7 +178,7 @@ func (r Rules) ReasonName(code string) string {
 	return code
 }
 
-// Threshold - минимальная выручка сегмента для встречи.
+// Threshold - the minimum revenue of a segment for a meeting.
 func (r Rules) Threshold(segment string) int64 {
 	if found, ok := r.segments[segment]; ok && found.Threshold > 0 {
 		return found.Threshold
@@ -186,26 +186,26 @@ func (r Rules) Threshold(segment string) int64 {
 	return r.minThreshold
 }
 
-// Gate - исход гейта записи на встречу.
+// Gate - the outcome of the meeting booking gate.
 type Gate string
 
 const (
 	GateOffer      Gate = "offer"
 	GateTooEarly   Gate = "too_early"
 	GateOffProfile Gate = "off_profile"
-	// GateMixedNiche - смесь ниш: встреча с пометкой менеджеру, без вопроса лиду.
+	// GateMixedNiche - a mix of niches: a meeting with a note for the manager, no question to the lead.
 	GateMixedNiche Gate = "mixed_niche"
 )
 
-// AllowsMeeting - гейт пропускает к окнам.
+// AllowsMeeting - the gate lets through to windows.
 func (g Gate) AllowsMeeting() bool {
 	return g == GateOffer || g == GateMixedNiche
 }
 
-// Gate решает исход по собранным фактам. Порядок: ниша, затем выручка - лиду
-// из исключённой ниши бессмысленно предлагать вернуться с большей выручкой.
-// Выручка сравнивается по верхней границе: гейт пропускающий, цена - нет.
-// Неопределённость (непонятная выручка) решается в пользу встречи.
+// Gate decides the outcome from the collected facts. Order: niche, then revenue, since
+// it is pointless to suggest that a lead from an excluded niche return with larger revenue.
+// Revenue is compared by the upper bound: the gate is permissive, the price is not.
+// Uncertainty (unintelligible revenue) is resolved in favor of a meeting.
 func (r Rules) Gate(facts Facts) Gate {
 	segment, reason := r.Segment(facts)
 	if reason != "" {
@@ -220,7 +220,7 @@ func (r Rules) Gate(facts Facts) Gate {
 	return GateOffer
 }
 
-// Причины, по которым окна и бронь не положены лиду.
+// Reasons why windows and booking are not due to a lead.
 const (
 	BlockMeetingScheduled = "meeting_scheduled"
 	BlockNicheUnknown     = "niche_unknown"
@@ -228,10 +228,10 @@ const (
 	BlockGateClosed       = "gate_closed"
 )
 
-// MeetingBlock - рубеж записи: окна и бронь только после вердикта ниши, при
-// полном наборе фактов, открытом гейте и без назначенной встречи. Пустая
-// строка - можно. Проверяют и агент (ответом инструмента), и dialog до брони:
-// вывод модели недоверенный.
+// MeetingBlock - the booking boundary: windows and booking only after the niche verdict, with
+// a full set of facts, an open gate and no appointed meeting. An empty
+// string means allowed. Checked by both the agent (as a tool answer) and dialog before booking:
+// model output is untrusted.
 func (r Rules) MeetingBlock(status Status, facts Facts) string {
 	switch {
 	case status == StatusMeetingScheduled:

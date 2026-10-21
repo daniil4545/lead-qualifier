@@ -1,11 +1,11 @@
-# Локальная база из docker-compose.yml; переопределяется окружением.
+# Local database from docker-compose.yml; overridden by the environment.
 DATABASE_URL ?= postgres://lq:lq@localhost:55432/lq?sslmode=disable
 export DATABASE_URL
 
 .PHONY: demo db build vet fmt-check lint test test-fast check prompteval
 
-# Демо в консоли: нужен только OPENROUTER_API_KEY. Логи уходят в demo.log,
-# чтобы не мешать переписке.
+# Console demo: only OPENROUTER_API_KEY is needed. Logs go to demo.log
+# so they do not interfere with the conversation.
 demo: db
 	go run ./cmd/lead-qualifier demo 2>>demo.log
 
@@ -24,16 +24,16 @@ fmt-check:
 lint:
 	golangci-lint run
 
-# Полный набор на Postgres из compose.
+# Full suite on Postgres from compose.
 test: db
 	go test ./...
 
-# Быстрый ярус без базы.
+# Fast tier without a database.
 test-fast:
 	go test -short ./...
 
 check: fmt-check vet lint test build
 
-# Эталоны каталога через живую модель: make prompteval ARGS="-n 3".
+# Golden fixtures of the catalog through a live model: make prompteval ARGS="-n 3".
 prompteval:
 	go run ./cmd/prompteval $(ARGS)

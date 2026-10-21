@@ -11,8 +11,8 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/store"
 )
 
-// ProcessCase - один ход по захваченному кейсу. claimAttempt - номер захвата
-// из ClaimNextCase: по нему считается потолок попыток и ограждается откладывание.
+// ProcessCase - one turn on a claimed case. claimAttempt is the claim number
+// from ClaimNextCase: the attempt ceiling is counted by it and deferral is fenced by it.
 func (w *Worker) ProcessCase(ctx context.Context, caseID int64, claimAttempt int) error {
 	input, err := w.store.LoadDecisionInput(ctx, caseID, w.now())
 	if err != nil {
@@ -29,8 +29,8 @@ func (w *Worker) ProcessCase(ctx context.Context, caseID int64, claimAttempt int
 	if err != nil {
 		return w.failTurn(ctx, claimAttempt, input, turn, err)
 	}
-	// Технический исход хода - сбой модели, а не решение: ход переигрывается,
-	// после потолка попыток кейс уходит к человеку обычным manual_review.
+	// A technical turn outcome is a model failure, not a decision: the turn is replayed,
+	// and after the attempt ceiling the case goes to a human as an ordinary manual_review.
 	if turn.Terminal == agent.TerminalManualReview && agent.TechnicalReasons[turn.Reason] {
 		if claimAttempt <= agentMaxAttempts {
 			return w.store.FailCase(ctx, caseID, claimAttempt, turn.Reason, "технический исход хода")
@@ -42,8 +42,8 @@ func (w *Worker) ProcessCase(ctx context.Context, caseID int64, claimAttempt int
 	if turnInput.Case.Facts == nil {
 		turnInput.Case.Facts = qualify.Facts{}
 	}
-	// Реплика писалась под прежнее решение и могла обещать встречу, которую
-	// пересчёт гейта сейчас отменит.
+	// The reply was written for the previous decision and could promise a meeting that
+	// the gate recomputation is about to cancel.
 	if gateNeedsReview(input, turn) {
 		turn.FinalText = ""
 	}
@@ -54,8 +54,8 @@ func (w *Worker) ProcessCase(ctx context.Context, caseID int64, claimAttempt int
 	decision.RawResponse = rawResponse(turn)
 	err = w.store.ApplyDecision(ctx, caseID, input.LastIncomingMessageID, decision, plan)
 	if errors.Is(err, store.ErrSlotTaken) {
-		// Окно заняли, пока шёл ход: бронь откатилась вместе с решением, лиду
-		// уходят свежие окна.
+		// The window was taken while the turn ran: the booking rolled back together with the decision, and the lead
+		// gets fresh windows.
 		slog.Warn("meeting slot taken", "case_id", caseID)
 		decision, plan, err = w.offerSlots(ctx, turnInput, "", w.catalog.Texts.SlotTaken, zeroTime, zeroTime)
 		if err != nil {
@@ -67,8 +67,8 @@ func (w *Worker) ProcessCase(ctx context.Context, caseID int64, claimAttempt int
 	return w.decisionRace(caseID, err)
 }
 
-// decisionRace гасит штатные гонки применения: новая реплика пришла во время
-// хода, решение уже применено, кейс закрылся. Ход переиграется сам.
+// decisionRace absorbs ordinary races on apply: a new message arrived during the
+// turn, the decision is already applied, the case is closed. The turn replays itself.
 func (w *Worker) decisionRace(caseID int64, err error) error {
 	switch {
 	case err == nil:
@@ -81,15 +81,15 @@ func (w *Worker) decisionRace(caseID int64, err error) error {
 	return fmt.Errorf("apply decision: %w", err)
 }
 
-// outcome - обработчик исхода по терминалу хода. Каждый собирает решение и
-// план целиком.
+// outcome - the handler of the turn outcome by terminal. Each one builds the decision and
+// the whole plan.
 func (w *Worker) outcome(ctx context.Context, input qualify.DecisionInput, turn agent.Turn) (store.Decision, store.Plan, error) {
 	switch turn.Terminal {
 	case agent.TerminalComplete:
 		return w.completeTurn(ctx, input, turn)
 	case agent.TerminalOfferSlots, agent.TerminalBookSlot:
-		// Рубеж записи перепроверяется до окон и брони: Turn недоверенный, и
-		// заглушка или сбой агента не должны дать встречу мимо гейта.
+		// The booking boundary is rechecked before windows and booking: Turn is untrusted, and
+		// an agent stub or failure must not yield a meeting that bypasses the gate.
 		if block := w.rules.MeetingBlock(input.Case.Status, input.Case.Facts); block != "" {
 			slog.Warn("meeting blocked", "case_id", input.Case.ID, "terminal", turn.Terminal.String(), "block", block)
 			return w.manualReview(input, "meeting_blocked:"+block, "rule")
@@ -105,15 +105,15 @@ func (w *Worker) outcome(ctx context.Context, input qualify.DecisionInput, turn 
 	case agent.TerminalManualReview:
 		return w.manualReview(input, turn.Reason, "llm")
 	}
-	// Лид поправил факт после решения, а повторный complete модель не позвала:
-	// гейт всё равно обязан пересмотреть решение.
+	// The lead corrected a fact after the decision and the model did not call complete again:
+	// the gate must still review the decision.
 	if gateNeedsReview(input, turn) {
 		return w.completeTurn(ctx, input, turn)
 	}
 	return w.replyTurn(input, turn), store.Plan{Reply: &store.Reply{Purpose: "agent_text", Text: turn.FinalText}}, nil
 }
 
-// gateNeedsReview - ход без терминала изменил факты уже решённого кейса.
+// gateNeedsReview - a turn without a terminal changed the facts of an already decided case.
 func gateNeedsReview(input qualify.DecisionInput, turn agent.Turn) bool {
 	return turn.Terminal == agent.TerminalNone && input.Case.Status == qualify.StatusReadyToDecide &&
 		turn.FactsChanged && len(turn.Facts.Missing()) == 0
@@ -126,8 +126,8 @@ func (w *Worker) replyTurn(input qualify.DecisionInput, turn agent.Turn) store.D
 	}
 }
 
-// completeTurn - исход собранных фактов: гейт решает, идёт лид на встречу или
-// получает вежливый отказ.
+// completeTurn - the outcome of the collected facts: the gate decides whether the lead goes to a meeting or
+// gets a polite refusal.
 func (w *Worker) completeTurn(ctx context.Context, input qualify.DecisionInput, turn agent.Turn) (store.Decision, store.Plan, error) {
 	facts := input.Case.Facts
 	if err := agent.EnsureNiche(ctx, w.agent, w.rules, input.Case.ID, facts, input.LeadBlock()); err != nil {
@@ -165,8 +165,8 @@ func (w *Worker) rejectTurn(input qualify.DecisionInput, turn agent.Turn, reason
 	}, nil
 }
 
-// closeTurn - отказ лида либо просьба не писать: бронь снимается, очередь
-// гасится до прощания, дальше бот первым не пишет.
+// closeTurn - a refusal from the lead or a request not to write: the booking is cancelled, the queue
+// is cleared before the farewell, and after that the bot does not write first.
 func (w *Worker) closeTurn(input qualify.DecisionInput, turn agent.Turn, status qualify.Status, text, note string) (store.Decision, store.Plan, error) {
 	decision := store.Decision{Source: "llm", Status: status, NextAction: turn.Terminal.String(),
 		Reason: turn.Reason, Facts: input.Case.Facts}
@@ -184,9 +184,9 @@ func (w *Worker) closeTurn(input qualify.DecisionInput, turn agent.Turn, status 
 	return decision, plan, nil
 }
 
-// manualReview - передача человеку: готовый ответ лиду и задача менеджеру,
-// кейс заморожен. Просьба перенести назначенную встречу - тот же выход со
-// своим текстом: подбор нового времени ведёт менеджер.
+// manualReview - handoff to a human: a ready reply to the lead and a task for the manager,
+// the case is frozen. A request to reschedule an appointed meeting is the same exit with
+// its own text: the manager picks the new time.
 func (w *Worker) manualReview(input qualify.DecisionInput, reason, source string) (store.Decision, store.Plan, error) {
 	text := w.catalog.Texts.Handoff
 	task := &store.Task{Text: "Лид передан человеку, причина: " + reason + ". " + w.factsSummary(input.Case.Facts)}
@@ -200,8 +200,8 @@ func (w *Worker) manualReview(input qualify.DecisionInput, reason, source string
 	return decision, store.Plan{Reply: &store.Reply{Purpose: "handoff", Text: text}, CRMTask: task}, nil
 }
 
-// failTurn разбирает сбой хода: отмена уходит наверх, постоянный сбой и
-// исчерпанный потолок попыток - к человеку, остальное откладывается.
+// failTurn handles a turn failure: cancellation goes up, a permanent failure and
+// an exhausted attempt ceiling go to a human, the rest is deferred.
 func (w *Worker) failTurn(ctx context.Context, claimAttempt int, input qualify.DecisionInput, turn agent.Turn, cause error) error {
 	if errors.Is(cause, context.Canceled) || ctx.Err() != nil {
 		return cause
@@ -216,7 +216,7 @@ func (w *Worker) failTurn(ctx context.Context, claimAttempt int, input qualify.D
 	}
 	slog.Warn("turn retry ceiling reached", "case_id", input.Case.ID, "kind", failure.Kind,
 		"permanent", failure.Permanent, "attempts", claimAttempt)
-	// Факты хода важнее снимка: ход мог собрать их и упасть после save_facts.
+	// Turn facts matter more than the snapshot: the turn may have collected them and failed after save_facts.
 	if len(turn.Facts) > 0 {
 		input.Case.Facts = turn.Facts
 	}
@@ -229,8 +229,8 @@ func (w *Worker) failTurn(ctx context.Context, claimAttempt int, input qualify.D
 	return w.decisionRace(input.Case.ID, w.store.ApplyDecision(ctx, input.Case.ID, input.LastIncomingMessageID, decision, plan))
 }
 
-// rawResponse - аудит хода в decisions.raw_response: инструменты, база,
-// нарушения guard и вердикты критика с цитатами. В лог это не идёт.
+// rawResponse - the turn audit in decisions.raw_response: tools, knowledge base,
+// guard violations and critic verdicts with quotes. It does not go to the log.
 func rawResponse(turn agent.Turn) map[string]any {
 	raw := map[string]any{
 		"terminal": turn.Terminal.String(),

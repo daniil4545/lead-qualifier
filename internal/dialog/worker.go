@@ -1,5 +1,5 @@
-// Package dialog - обработчик кейсов: захват кейса, ход агента, применение
-// решения и доставка outbox. Транспорт и CRM приходят снаружи интерфейсами.
+// Package dialog - the case handler: case claim, agent turn, applying
+// the decision and outbox delivery. Transport and CRM come in from outside as interfaces.
 package dialog
 
 import (
@@ -19,32 +19,32 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/store"
 )
 
-// Agent - ход модели. Заглушка в тестах возвращает готовый Turn.
+// Agent - a model turn. The stub in tests returns a ready Turn.
 type Agent interface {
 	RunTurn(ctx context.Context, input qualify.DecisionInput) (agent.Turn, error)
 	agent.NicheClassifier
 }
 
-// Sender - транспорт до лида. Возвращает внешний id сообщения.
+// Sender - transport to the lead. Returns the external message id.
 type Sender interface {
 	Send(ctx context.Context, peerRef, text string) (string, error)
 }
 
 const (
-	// caseLease - аренда кейса на ход: девять вызовов модели с таймаутами
-	// укладываются с запасом.
+	// caseLease - the lease of a case for a turn: nine model calls with timeouts
+	// fit with room to spare.
 	caseLease = 10 * time.Minute
-	// outboxLease - аренда строки доставки.
+	// outboxLease - the lease of a delivery row.
 	outboxLease = time.Minute
 	pollPeriod  = 500 * time.Millisecond
-	// agentMaxAttempts - сколько раз сбойный ход откладывается и переигрывается;
-	// следующий захват уводит кейс к человеку, а не держит лида без ответа.
+	// agentMaxAttempts - how many times a failed turn is deferred and replayed;
+	// the next claim sends the case to a human instead of leaving the lead without an answer.
 	agentMaxAttempts = 3
-	// offeredSlotsTTL - сколько живёт показанный набор окон.
+	// offeredSlotsTTL - how long a shown set of windows lives.
 	offeredSlotsTTL = 48 * time.Hour
 )
 
-// Deps - зависимости обработчика. Now nil - системные часы.
+// Deps - the handler dependencies. A nil Now means the system clock.
 type Deps struct {
 	Store    *store.Store
 	Agent    Agent
@@ -55,9 +55,9 @@ type Deps struct {
 	Now      func() time.Time
 }
 
-// Worker ведёт кейсы и доставку. Один экземпляр на процесс: захват кейса и
-// строки outbox идёт через SKIP LOCKED, так что второй не сломал бы порядок,
-// но и не нужен.
+// Worker drives cases and delivery. One instance per process: case claim and
+// outbox rows go through SKIP LOCKED, so a second one would not break the order,
+// but is not needed either.
 type Worker struct {
 	store    *store.Store
 	agent    Agent
@@ -70,7 +70,7 @@ type Worker struct {
 	wake     chan struct{}
 }
 
-// New собирает обработчик.
+// New builds the handler.
 func New(deps Deps) *Worker {
 	now := deps.Now
 	if now == nil {
@@ -83,13 +83,13 @@ func New(deps Deps) *Worker {
 	}
 }
 
-// StartCase заводит кейс по заявке из CRM: бот пишет приветствие первым.
+// StartCase creates a case from a CRM lead: the bot writes the greeting first.
 func (w *Worker) StartCase(ctx context.Context, lead qualify.Lead) (qualify.Case, error) {
 	greeting := render(w.catalog.Texts.Greeting, "{name}", lead.Name)
 	return w.store.CreateCase(ctx, lead, greeting)
 }
 
-// Ingest принимает реплику лида и будит обработчик, если кейс ждёт хода.
+// Ingest accepts a lead's message and wakes the handler if the case is waiting for a turn.
 func (w *Worker) Ingest(ctx context.Context, peerRef, text, externalID string) error {
 	_, woke, err := w.store.Ingest(ctx, peerRef, text, externalID)
 	if err != nil {
@@ -101,12 +101,12 @@ func (w *Worker) Ingest(ctx context.Context, peerRef, text, externalID string) e
 	return nil
 }
 
-// Idle - по собеседнику не осталось работы: ход сделан, ответ доставлен.
+// Idle - no work is left for the peer: the turn is done, the reply is delivered.
 func (w *Worker) Idle(ctx context.Context, peerRef string) (bool, error) {
 	return w.store.PeerIdle(ctx, peerRef)
 }
 
-// Wake будит цикл кейсов, не дожидаясь тика.
+// Wake wakes the case loop without waiting for the tick.
 func (w *Worker) Wake() {
 	select {
 	case w.wake <- struct{}{}:
@@ -114,8 +114,8 @@ func (w *Worker) Wake() {
 	}
 }
 
-// Run крутит два цикла: ходы по кейсам и доставку outbox. Останавливается с
-// отменой контекста.
+// Run runs two loops: turns on cases and outbox delivery. Stops with
+// context cancellation.
 func (w *Worker) Run(ctx context.Context) error {
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.Go(func() error { return w.runCases(groupCtx) })
@@ -138,8 +138,8 @@ func (w *Worker) runCases(ctx context.Context) error {
 			if ctx.Err() != nil {
 				return nil
 			}
-			// Сбой базы временный: цикл продолжает со следующего тика, иначе
-			// консоль принимала бы ввод при мёртвом обработчике.
+			// A database failure is temporary: the loop continues from the next tick, otherwise
+			// the console would accept input with a dead handler.
 			slog.Error("claim case failed", "error", err)
 			continue
 		}
@@ -166,7 +166,7 @@ func (w *Worker) runOutbox(ctx context.Context) error {
 			return nil
 		}
 		if err != nil {
-			// Строка остаётся арендованной и вернётся в выборку после аренды.
+			// The row stays leased and returns to the selection after the lease.
 			slog.Error("outbox delivery failed", "error", err)
 		}
 		if delivered && err == nil {
@@ -181,9 +181,9 @@ func (w *Worker) runOutbox(ctx context.Context) error {
 	}
 }
 
-// DeliverNext доставляет одну строку outbox. Повтор идемпотентен: CRM получает
-// ключ строки, транспорт - ту же строку, пока она не отмечена отправленной.
-// false - доставлять нечего.
+// DeliverNext delivers one outbox row. A retry is idempotent: the CRM gets
+// the row key, the transport gets the same row until it is marked as sent.
+// false means there is nothing to deliver.
 func (w *Worker) DeliverNext(ctx context.Context) (bool, error) {
 	item, ok, err := w.store.ClaimOutbox(ctx, outboxLease)
 	if err != nil || !ok {

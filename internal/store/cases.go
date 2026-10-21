@@ -12,8 +12,8 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/qualify"
 )
 
-// CreateCase заводит лида по заявке, кейс в сборе и приветствие в outbox.
-// Бот пишет первым: ответ лида продолжит этот же кейс.
+// CreateCase creates a lead from a CRM request, a case in collection and a greeting in the outbox.
+// The bot writes first: the lead's reply continues this same case.
 func (s *Store) CreateCase(ctx context.Context, lead qualify.Lead, greeting string) (qualify.Case, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -45,9 +45,9 @@ func (s *Store) CreateCase(ctx context.Context, lead qualify.Lead, greeting stri
 	return created, nil
 }
 
-// Ingest сохраняет реплику лида. Живой кейс встаёт в очередь хода, отказ
-// возвращается в сбор с прежними фактами, закрытый кейс копит сообщение молча.
-// Возвращает кейс и признак, что он ждёт хода.
+// Ingest saves a lead's message. A live case is queued for a turn, a refusal
+// returns to collection with the previous facts, a closed case accumulates the message silently.
+// Returns the case and a flag that it is waiting for a turn.
 func (s *Store) Ingest(ctx context.Context, peerRef, text, externalID string) (int64, bool, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -108,9 +108,9 @@ func (s *Store) Ingest(ctx context.Context, peerRef, text, externalID string) (i
 	return current.ID, true, nil
 }
 
-// ClaimNextCase берёт кейс с необработанной репликой лида. Недоставленный
-// ответ держит кейс: второй ход поверх первого дал бы два ответа на одно
-// входящее. attempts растёт с каждым захватом и сбрасывается решением.
+// ClaimNextCase takes a case with an unprocessed lead message. An undelivered
+// reply holds the case: a second turn on top of the first would give two replies to one
+// incoming message. attempts grows with each claim and is reset by a decision.
 func (s *Store) ClaimNextCase(ctx context.Context, lease time.Duration) (qualify.Case, bool, error) {
 	claimed, err := scanCase(s.pool.QueryRow(ctx, `
 		UPDATE cases SET next_action_at = now() + $1::interval, attempts = attempts + 1, updated_at = now()
@@ -137,7 +137,7 @@ func (s *Store) ClaimNextCase(ctx context.Context, lease time.Duration) (qualify
 	return claimed, true, nil
 }
 
-// LoadDecisionInput - снимок кейса для хода. now отсекает протухший набор окон.
+// LoadDecisionInput - the case snapshot for a turn. now cuts off a stale set of windows.
 func (s *Store) LoadDecisionInput(ctx context.Context, caseID int64, now time.Time) (qualify.DecisionInput, error) {
 	input := qualify.DecisionInput{Now: now}
 	var err error
@@ -204,7 +204,7 @@ func scanMeeting(row rowScanner) (qualify.Meeting, error) {
 	return meeting, err
 }
 
-// BusyMeetings - активные брони, пересекающие [from, to): занятость для подбора.
+// BusyMeetings - active bookings overlapping [from, to): occupancy for selection.
 func (s *Store) BusyMeetings(ctx context.Context, from, to time.Time) ([]qualify.Meeting, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT `+meetingColumns+` FROM meetings
@@ -222,8 +222,8 @@ func (s *Store) BusyMeetings(ctx context.Context, from, to time.Time) ([]qualify
 	return meetings, nil
 }
 
-// FailCase откладывает ход после сбоя модели: статус не меняется, вход
-// остаётся необработанным. claimAttempt ограждает от перехваченного захвата.
+// FailCase defers a turn after a model failure: the status does not change, the input
+// stays unprocessed. claimAttempt guards against a taken-over claim.
 func (s *Store) FailCase(ctx context.Context, caseID int64, claimAttempt int, kind, message string) error {
 	retryIn := retryBackoff(claimAttempt)
 	tx, err := s.pool.Begin(ctx)
@@ -253,7 +253,7 @@ func (s *Store) FailCase(ctx context.Context, caseID int64, claimAttempt int, ki
 	return nil
 }
 
-// retryBackoff - пауза перед повтором хода: 1, 2, 4 минуты и дальше до 16.
+// retryBackoff - the pause before a turn retry: 1, 2, 4 minutes and on up to 16.
 func retryBackoff(attempt int) time.Duration {
 	backoff := time.Minute
 	for index := 1; index < attempt && backoff < 16*time.Minute; index++ {
@@ -262,8 +262,8 @@ func retryBackoff(attempt int) time.Duration {
 	return backoff
 }
 
-// PeerIdle - у кейса собеседника нет работы: ни необработанной реплики в живом
-// кейсе, ни недоставленной строки outbox.
+// PeerIdle - the peer's case has no work: no unprocessed message in a live
+// case and no undelivered outbox row.
 func (s *Store) PeerIdle(ctx context.Context, peerRef string) (bool, error) {
 	var busy bool
 	if err := s.pool.QueryRow(ctx, `

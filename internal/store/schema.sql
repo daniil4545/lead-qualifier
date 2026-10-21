@@ -1,5 +1,5 @@
--- Схема квалификатора одной миграцией. Кейс - проекция, decisions и
--- case_events - журнал, outbox - действия наружу в транзакции решения.
+-- The qualifier schema in one migration. The case is a projection, decisions and
+-- case_events are the journal, outbox holds outward actions in the decision transaction.
 
 CREATE TABLE IF NOT EXISTS leads (
     id         bigserial PRIMARY KEY,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS cases (
     updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
--- Один кейс на лида: повторный вход лида продолжает тот же разговор.
+-- One case per lead: a repeated entry by the lead continues the same conversation.
 CREATE UNIQUE INDEX IF NOT EXISTS cases_lead_idx ON cases (lead_id);
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS messages (
     direction    text NOT NULL CHECK (direction IN ('in', 'out')),
     text         text NOT NULL,
     external_id  text NOT NULL DEFAULT '',
-    -- processed_at - ход ответил на эту реплику лида; у исходящих пусто.
+    -- processed_at - the turn answered this lead message; empty for outgoing ones.
     processed_at timestamptz,
     created_at   timestamptz NOT NULL DEFAULT now()
 );
@@ -85,8 +85,8 @@ CREATE TABLE IF NOT EXISTS meetings (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Двойную бронь держит база, а не подбор окон: два лида на одно окно
--- менеджера не пройдут, сколько бы ходов ни шло параллельно.
+-- A double booking is held by the database, not by window selection: two leads cannot take the same window
+-- of a manager no matter how many turns run in parallel.
 CREATE UNIQUE INDEX IF NOT EXISTS meetings_slot_idx ON meetings (manager_id, starts_at)
     WHERE status = 'scheduled';
 CREATE UNIQUE INDEX IF NOT EXISTS meetings_case_idx ON meetings (case_id)
@@ -110,6 +110,6 @@ CREATE TABLE IF NOT EXISTS outbox (
     sent_at         timestamptz
 );
 
--- Повтор решения на тот же вход не ставит вторую строку.
+-- A repeated decision on the same input does not add a second row.
 CREATE UNIQUE INDEX IF NOT EXISTS outbox_cause_idx ON outbox (case_id, kind, purpose, cause_key);
 CREATE INDEX IF NOT EXISTS outbox_pending_idx ON outbox (next_attempt_at, id) WHERE status IN ('pending', 'sending');

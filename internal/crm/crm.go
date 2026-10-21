@@ -1,6 +1,6 @@
-// Package crm - граница с CRM: заявка, заметка по сделке, задача менеджеру.
-// Фейк держит записи в памяти и печатает их, чтобы демо было видно без
-// внешнего аккаунта.
+// Package crm - the CRM boundary: a lead request, a deal note, a manager task.
+// The fake keeps records in memory and prints them so the demo is visible without
+// an external account.
 package crm
 
 import (
@@ -10,15 +10,15 @@ import (
 	"sync"
 )
 
-// CRM - то, что квалификатор делает в CRM. Key - ключ идемпотентности:
-// повтор с тем же ключом не создаёт вторую запись.
+// CRM - what the qualifier does in the CRM. Key is the idempotency key:
+// a repeat with the same key does not create a second record.
 type CRM interface {
 	CreateLead(ctx context.Context, name string) (string, error)
 	AddNote(ctx context.Context, key, leadRef, text string) error
 	AddTask(ctx context.Context, key, leadRef, managerID, text string) error
 }
 
-// Record - одна запись фейка: что и с какими полями вызвали.
+// Record - one fake record: what was called and with which fields.
 type Record struct {
 	Kind      string // lead, note, task
 	Key       string
@@ -27,7 +27,7 @@ type Record struct {
 	Text      string
 }
 
-// Fake - CRM в памяти. Out - куда печатать записи; nil - молча.
+// Fake - an in-memory CRM. Out is where to print records; nil means silently.
 type Fake struct {
 	Out io.Writer
 
@@ -37,12 +37,12 @@ type Fake struct {
 	leads   int
 }
 
-// NewFake создаёт пустую CRM.
+// NewFake creates an empty CRM.
 func NewFake(out io.Writer) *Fake {
 	return &Fake{Out: out, keys: map[string]bool{}}
 }
 
-// CreateLead заводит заявку и возвращает её номер.
+// CreateLead creates a request and returns its number.
 func (f *Fake) CreateLead(_ context.Context, name string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -52,7 +52,7 @@ func (f *Fake) CreateLead(_ context.Context, name string) (string, error) {
 	return ref, nil
 }
 
-// AddNote пишет заметку в сделку.
+// AddNote writes a note to the deal.
 func (f *Fake) AddNote(_ context.Context, key, leadRef, text string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -63,7 +63,7 @@ func (f *Fake) AddNote(_ context.Context, key, leadRef, text string) error {
 	return nil
 }
 
-// AddTask ставит задачу менеджеру; пустой managerID - ответственному сделки.
+// AddTask puts a task for the manager; an empty managerID means the deal owner.
 func (f *Fake) AddTask(_ context.Context, key, leadRef, managerID, text string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -74,7 +74,7 @@ func (f *Fake) AddTask(_ context.Context, key, leadRef, managerID, text string) 
 	return nil
 }
 
-// Records - копия всех записей в порядке создания.
+// Records - a copy of all records in creation order.
 func (f *Fake) Records() []Record {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -91,6 +91,6 @@ func (f *Fake) add(record Record) {
 	if record.ManagerID != "" {
 		target += ", менеджер " + record.ManagerID
 	}
-	// Печать в демо - часть вывода, а не лог: её ошибка ничего не ломает.
+	// Printing in the demo is part of the output, not a log: its error breaks nothing.
 	_, _ = fmt.Fprintf(f.Out, "[CRM %s %s] %s\n", record.Kind, target, record.Text)
 }

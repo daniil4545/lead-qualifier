@@ -1,6 +1,6 @@
-// Package calendar строит свободные окна менеджеров: сетка рабочих часов с
-// шагом в длительность встречи минус занятость. Бронь здесь не живёт -
-// двойную запись держит уникальность в базе.
+// Package calendar builds the free windows of managers: a grid of working hours with
+// a step of the meeting duration minus occupancy. The booking does not live here -
+// a double entry is held by uniqueness in the database.
 package calendar
 
 import (
@@ -13,37 +13,37 @@ import (
 )
 
 const (
-	// Horizon - дальше этого срока от текущего момента бот не записывает.
+	// Horizon - the bot does not book beyond this period from the current moment.
 	Horizon = 14 * 24 * time.Hour
-	// MinLead - минимальный зазор от текущего момента до встречи.
+	// MinLead - the minimum gap from the current moment to a meeting.
 	MinLead = 2 * time.Hour
-	// ShowDays - сколько календарных дней с окнами показывается лиду за раз.
+	// ShowDays - how many calendar days with windows are shown to the lead at a time.
 	ShowDays = 3
 )
 
-// Interval - занятый отрезок менеджера.
+// Interval - a busy interval of a manager.
 type Interval struct {
 	Start time.Time
 	End   time.Time
 }
 
-// Busy - занятость по id менеджера.
+// Busy - occupancy by manager id.
 type Busy map[string][]Interval
 
-// Slot - свободное окно конкретного менеджера.
+// Slot - a free window of a specific manager.
 type Slot struct {
 	ManagerID string
 	Start     time.Time
 	End       time.Time
 }
 
-// Calendar - откуда берутся окна. Локальная реализация считает их по рабочим
-// часам каталога; внешний календарь добавил бы свою занятость.
+// Calendar - where windows come from. The local implementation computes them from the catalog
+// working hours; an external calendar would add its own occupancy.
 type Calendar interface {
-	// Offer - окна менеджера с самым ранним свободным стартом в [from, until),
-	// первые ShowDays дней. Нулевые границы - от now+MinLead до now+Horizon.
+	// Offer - windows of the manager with the earliest free start in [from, until),
+	// the first ShowDays days. Zero bounds mean from now+MinLead to now+Horizon.
 	Offer(busy Busy, now, from, until time.Time) []Slot
-	// Available - свободный менеджер на точный старт.
+	// Available - a free manager for an exact start.
 	Available(busy Busy, now, start time.Time) (Slot, bool)
 }
 
@@ -52,15 +52,15 @@ type managerHours struct {
 	windows map[time.Weekday]config.Window
 }
 
-// Local - календарь по рабочим часам каталога.
+// Local - a calendar by the catalog working hours.
 type Local struct {
 	location *time.Location
 	duration time.Duration
-	managers []managerHours // по Priority, затем по id
+	managers []managerHours // by Priority, then by id
 }
 
-// NewLocal собирает календарь каталога. Менеджер без своих часов работает по
-// общим часам каталога.
+// NewLocal builds the catalog calendar. A manager without own hours works by the
+// common catalog hours.
 func NewLocal(catalog config.Catalog) (*Local, error) {
 	local := &Local{
 		location: catalog.Location,
@@ -86,10 +86,10 @@ func NewLocal(catalog config.Catalog) (*Local, error) {
 	return local, nil
 }
 
-// Offer отдаёт набор одного менеджера: лид выбирает время, а не человека.
-// Побеждает самый ранний свободный старт, при равенстве меньший Priority,
-// затем меньший id - порядок managers уже такой, поэтому равный старт
-// следующего менеджера победителя не сменит.
+// Offer returns the set of one manager: the lead chooses a time, not a person.
+// The earliest free start wins, on a tie the smaller Priority, then
+// the smaller id - the managers order is already so, so an equal start
+// of the next manager does not change the winner.
 func (l *Local) Offer(busy Busy, now, from, until time.Time) []Slot {
 	var best []Slot
 	for _, manager := range l.managers {
@@ -104,7 +104,7 @@ func (l *Local) Offer(busy Busy, now, from, until time.Time) []Slot {
 	return best
 }
 
-// Available ищет свободного на точный старт в порядке Priority, затем id.
+// Available looks for a free manager for an exact start in order of Priority, then id.
 func (l *Local) Available(busy Busy, now, start time.Time) (Slot, bool) {
 	dayStart := startOfDay(start, l.location)
 	for _, manager := range l.managers {
@@ -117,8 +117,8 @@ func (l *Local) Available(busy Busy, now, start time.Time) (Slot, bool) {
 	return Slot{}, false
 }
 
-// managerSlots - сетка рабочих окон менеджера минус занятость, первые
-// ShowDays дней, где есть хотя бы одно окно.
+// managerSlots - the manager's grid of working windows minus occupancy, the first
+// ShowDays days that have at least one window.
 func (l *Local) managerSlots(manager managerHours, busy Busy, now, from, until time.Time) []Slot {
 	limit := now.Add(Horizon)
 	if !until.IsZero() && until.Before(limit) {
@@ -146,9 +146,9 @@ func (l *Local) managerSlots(manager managerHours, busy Busy, now, from, until t
 
 func (l *Local) daySlots(managerID string, window config.Window, day time.Time, busy []Interval, minStart, limit time.Time) []Slot {
 	windowEnd := time.Date(day.Year(), day.Month(), day.Day(), window.EndHour, window.EndMinute, 0, 0, l.location)
-	// Сетка от начала рабочего дня с шагом в длительность встречи: у всех броней
-	// менеджера за день одна сетка, поэтому окна не пересекаются, и уникальности
-	// (менеджер, начало) в базе хватает против двойной записи.
+	// A grid from the start of the working day with a step of the meeting duration: all bookings
+	// of a manager in a day share one grid, so windows do not overlap, and the uniqueness of
+	// (manager, start) in the database suffices against a double entry.
 	var slots []Slot
 	for start := time.Date(day.Year(), day.Month(), day.Day(), window.StartHour, window.StartMinute, 0, 0, l.location); ; start = start.Add(l.duration) {
 		end := start.Add(l.duration)

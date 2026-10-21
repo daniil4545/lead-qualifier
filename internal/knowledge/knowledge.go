@@ -1,5 +1,5 @@
-// Package knowledge - база знаний каталога для search_kb и её проверка перед
-// стартом: всё, что лежит в базе, модель может повторить лиду дословно.
+// Package knowledge - the catalog knowledge base for search_kb and its check before
+// start: anything in the base the model may repeat to the lead verbatim.
 package knowledge
 
 import (
@@ -12,22 +12,22 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/config"
 )
 
-// IndexFile - оглавление базы: идёт в system prompt, а не в search_kb.
+// IndexFile - the base table of contents: goes into the system prompt, not search_kb.
 const IndexFile = "index.md"
 
-// PreloadFile - раздел частых вопросов: если он есть, ход получает его сразу,
-// без вызова search_kb. Иначе критику нечем подтвердить ответ на типовой вопрос.
+// PreloadFile - the frequent questions section: if present, the turn gets it right away,
+// without a search_kb call. Otherwise the critic has nothing to confirm an answer to a typical question.
 const PreloadFile = "faq.md"
 
-// Set - база знаний: оглавление и тела разделов по имени файла. Ключи Files и
-// есть белый список search_kb.
+// Set - the knowledge base: the table of contents and section bodies by file name. The keys of Files
+// are the search_kb whitelist.
 type Set struct {
 	Index string
 	Files map[string]string
 }
 
-// Load читает dir/knowledge. В базе допустимы только .md: посторонний файл ушёл
-// бы в поиск мимо проверок.
+// Load reads dir/knowledge. Only .md is allowed in the base: a foreign file would go
+// into search bypassing the checks.
 func Load(dir string) (Set, error) {
 	base := filepath.Join(dir, "knowledge")
 	entries, err := os.ReadDir(base)
@@ -58,8 +58,8 @@ func Load(dir string) (Set, error) {
 	return set, nil
 }
 
-// LoadStopNames читает словарь имён и брендов третьих лиц: строка - запись,
-// # - комментарий.
+// LoadStopNames reads the dictionary of third-party names and brands: a line is an entry,
+// # is a comment.
 func LoadStopNames(dir string) ([]string, error) {
 	data, err := os.ReadFile(filepath.Join(dir, "stop_names.txt"))
 	if err != nil {
@@ -76,11 +76,11 @@ func LoadStopNames(dir string) ([]string, error) {
 	return names, nil
 }
 
-// LinkPattern - ссылки со схемой, t.me, @хендлы и голые домены.
+// LinkPattern - links with a scheme, t.me, @handles and bare domains.
 var LinkPattern = regexp.MustCompile(`(?i)https?://\S+|t\.me/\S+|@\w+|[a-zа-я0-9-]+(?:\.[a-zа-я0-9-]+)*\.(?:[a-z]{2,}|рф)(?:/\S*)?`)
 
-// LinkKey нормализует ссылку до ключа сверки: @хендл и t.me - к «t.me/<канал>»,
-// прочее - к хосту без схемы и пути. Официальный домен с любым путём проходит.
+// LinkKey normalizes a link to a comparison key: @handle and t.me to "t.me/<channel>",
+// anything else to the host without scheme and path. The official domain passes with any path.
 func LinkKey(token string) string {
 	t := strings.ToLower(strings.Trim(token, ` .,;:!?()[]{}<>"'`+"«»"))
 	if strings.HasPrefix(t, "@") {
@@ -108,7 +108,7 @@ func LinkKey(token string) string {
 	return host
 }
 
-// LinkWhitelist - ключи ссылок каталога: только их бот вправе повторить.
+// LinkWhitelist - the catalog link keys: only these may be repeated by the bot.
 func LinkWhitelist(catalog config.Catalog) map[string]bool {
 	whitelist := make(map[string]bool, len(catalog.Links))
 	for _, link := range catalog.Links {
@@ -126,9 +126,9 @@ var (
 	lintIndexed = regexp.MustCompile(`(?m)^-\s+(\S+\.md)`)
 )
 
-// Lint проверяет, что базу можно показывать лиду: суммы - только цены тарифов
-// каталога, ссылки - только ссылки каталога, без телефонов, почты и стоп-имён,
-// оглавление перечисляет ровно существующие разделы. Пустой ответ - база чиста.
+// Lint checks that the base can be shown to a lead: amounts are only catalog tariff prices,
+// links are only catalog links, no phones, e-mail or stop names,
+// the table of contents lists exactly the existing sections. An empty answer means the base is clean.
 func Lint(set Set, catalog config.Catalog, stopNames []string) []string {
 	var problems []string
 	prices := map[string]bool{}
@@ -174,7 +174,7 @@ func lintFile(name, content string, prices, whitelist map[string]bool, stopNames
 		problems = append(problems, fmt.Sprintf("%s: email-like text %q", name, match))
 	}
 	for _, token := range LinkPattern.FindAllString(content, -1) {
-		// Имена разделов базы похожи на домены, но ссылками не являются.
+		// Section names of the base look like domains but are not links.
 		key := LinkKey(token)
 		if strings.HasSuffix(key, ".md") || whitelist[key] {
 			continue

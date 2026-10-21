@@ -12,23 +12,23 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/qualify"
 )
 
-// Prompts - system-промпты трёх ролей: агент диалога, критик и классификатор
-// ниши. Имя компании, персона и её род подставляются из каталога, чтобы в
-// тексте промптов не было литералов клиента.
+// Prompts - the system prompts of three roles: the dialog agent, the critic and the niche
+// classifier. The company name, persona and its gender are substituted from the catalog so that
+// no customer literals appear in the prompt text.
 type Prompts struct {
 	System string
 	Critic string
 	Niche  string
 }
 
-// LoadPrompts читает dir/prompts и собирает system prompt агента вместе с
-// оглавлением базы знаний.
+// LoadPrompts reads dir/prompts and builds the agent system prompt together with
+// the knowledge base table of contents.
 func LoadPrompts(dir string, catalog config.Catalog, kb knowledge.Set) (Prompts, error) {
 	return LoadPromptsFrom(filepath.Join(dir, "prompts"), catalog, kb)
 }
 
-// LoadPromptsFrom - то же из произвольной папки промптов: prompteval так
-// сравнивает кандидата с промптами каталога на той же базе знаний.
+// LoadPromptsFrom - the same from an arbitrary prompts folder: prompteval uses it
+// to compare a candidate with the catalog prompts on the same knowledge base.
 func LoadPromptsFrom(promptsDir string, catalog config.Catalog, kb knowledge.Set) (Prompts, error) {
 	gender := "мужском"
 	if catalog.Persona.Gender == config.GenderFemale {
@@ -62,9 +62,9 @@ func LoadPromptsFrom(promptsDir string, catalog config.Catalog, kb knowledge.Set
 	return prompts, nil
 }
 
-// FromCatalog собирает агента каталога: база знаний, стоп-имена, промпты,
-// правила и guard. База проверяется до старта: всё, что в ней лежит, модель
-// вправе повторить лиду. promptsDir пустой - промпты каталога.
+// FromCatalog builds the catalog agent: knowledge base, stop names, prompts,
+// rules and guard. The base is validated before start: anything in it the model
+// may repeat to the lead. An empty promptsDir means the catalog prompts.
 func FromCatalog(catalogDir, promptsDir string, cfg config.OpenRouter, catalog config.Catalog,
 	httpClient *http.Client) (*Client, error) {
 	kb, err := knowledge.Load(catalogDir)

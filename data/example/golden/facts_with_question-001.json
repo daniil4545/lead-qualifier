@@ -28,5 +28,5 @@
   "expected_fact_parts": {},
   "expected_tool_args": {},
   "forbidden_response": [],
-  "reason": "Три факта и вопрос: сохранить факты, ответить по базе про выезд и спросить недостающее, без complete."
+  "reason": "Three facts and a question: save the facts, answer from the knowledge base about on-site visits and ask for the missing facts, no complete."
 }

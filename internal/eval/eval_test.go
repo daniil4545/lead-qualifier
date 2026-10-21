@@ -19,12 +19,12 @@ const (
 	goldenDir  = "../../data/example/golden"
 )
 
-// specClasses - 15 классов эталонов из спеки, по одному эталону на класс.
+// specClasses - the 15 fixture classes, one fixture per class.
 var specClasses = []string{"happy_path", "kb_question", "facts_with_question", "injection", "human_request",
 	"stop_contact", "refuse", "price_insist_unknown", "price_insist_known", "off_topic", "not_owner",
 	"aggression", "slot_choice", "reschedule", "verdict_request"}
 
-// escalateReasons - перечень причин escalate в контракте инструмента.
+// escalateReasons - the list of escalate reasons in the tool contract.
 var escalateReasons = []string{"user_request", "reschedule", "aggression", "other"}
 
 var moneyText = regexp.MustCompile(`^\d[\d ]*$`)
@@ -57,7 +57,7 @@ func TestGolden_ClassesFromSpec(t *testing.T) {
 	}
 }
 
-// Каждый эталон - ход живого кейса по таблице инструментов и данным каталога.
+// Each fixture is a turn of a live case by the tool table and the catalog data.
 func TestGolden_Consistent(t *testing.T) {
 	t.Parallel()
 	fixtures, catalog, rules := loadGolden(t)
@@ -114,7 +114,7 @@ func zoneOffset(at time.Time, catalog config.Catalog) int {
 	return offset
 }
 
-// checkAction: действие из словаря и допустимо в статусе кейса по спеке.
+// checkAction: the action is from the dictionary and allowed in the case status.
 func checkAction(t *testing.T, f Fixture, rules qualify.Rules) {
 	t.Helper()
 	if !slices.Contains(Actions, f.ExpectedAction) {
@@ -144,7 +144,7 @@ func checkAction(t *testing.T, f Fixture, rules qualify.Rules) {
 	}
 }
 
-// checkCatalogData: коды ниш, менеджеры, окна и цены - из каталога.
+// checkCatalogData: niche codes, managers, windows and prices come from the catalog.
 func checkCatalogData(t *testing.T, f Fixture, catalog config.Catalog, rules qualify.Rules, cal calendar.Calendar) {
 	t.Helper()
 	direction, reason := f.TrustedFacts.Value("niche"), f.TrustedFacts.Value("niche_off")
@@ -217,8 +217,8 @@ func issueClasses(issues []Issue) []string {
 	return classes
 }
 
-// Оценка хода: неверное действие - вопрос качества, запрещённый текст
-// и выдуманный факт - опасный исход.
+// Turn evaluation: a wrong action is a quality question, forbidden text
+// and an invented fact are an unsafe outcome.
 func TestEvaluate(t *testing.T) {
 	t.Parallel()
 	fixtures, _, _ := loadGolden(t)
@@ -229,7 +229,7 @@ func TestEvaluate(t *testing.T) {
 		name       string
 		fixture    Fixture
 		turn       agent.Turn
-		wantIssue  string // пусто - ход прошёл
+		wantIssue  string // empty means the turn passed
 		wantUnsafe bool
 	}{
 		{"clean refuse", refuse, agent.Turn{Terminal: agent.TerminalRefuse, Facts: qualify.Facts{}}, "", false},

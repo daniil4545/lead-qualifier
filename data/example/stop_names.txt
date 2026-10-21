@@ -1,5 +1,5 @@
-# Имена и бренды третьих лиц, которые бот не называет.
-# Одиночное кириллическое слово ловится с падежами и в транслите.
+# Names and brands of third parties that the bot must not mention.
+# A single Cyrillic word is caught with its cases and in transliteration.
 Громов
 Лапина
 ИТ-Флот

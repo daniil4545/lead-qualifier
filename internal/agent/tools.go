@@ -10,9 +10,9 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/qualify"
 )
 
-// tools - статический контракт инструментов. Допустимость вызова решает Go
-// ответом инструмента, а не пересборкой схемы: модель получает объяснение и
-// продолжает ход.
+// tools - the static tool contract. The code decides whether a call is allowed
+// with a tool answer, not by rebuilding the schema: the model gets an explanation and
+// continues the turn.
 func tools() []tool {
 	return []tool{
 		{Type: "function", Function: function{
@@ -90,8 +90,8 @@ func tools() []tool {
 	}
 }
 
-// Ответы инструментов на ветках, где решение принял код и допечатает свой
-// текст. Модели остаётся одна работа - ответить на вопрос лида, если он был.
+// Tool answers on branches where the code made the decision and will append its own
+// text. The model has one job left: answer the lead's question, if there was one.
 const (
 	replyRoleLine = `Твоя реплика: спросил ли лид о чём-нибудь - ответь на его вопрос по базе знаний, ` +
 		`по существу, одним-тремя предложениями. Вопроса не было - ответь одним символом «-». ` +
@@ -106,19 +106,19 @@ func decidedToolResult(decision string) string {
 	return "Решение: " + decision + ". За твоей репликой лид получит готовый текст от кода.\n" + replyRoleLine
 }
 
-// dashOnlyReply - реплика из одного дефиса: модель отказалась от текста там,
-// где решение несёт готовый текст кода.
+// dashOnlyReply - a reply of a single hyphen: the model declined to write text where
+// the decision carries a ready code text.
 func dashOnlyReply(text string) bool {
 	trimmed := strings.TrimSpace(strings.Trim(strings.TrimSpace(text), "«»\"'"))
 	return trimmed == "-" || trimmed == "–" || trimmed == "—"
 }
 
-// clockPattern - время book_slot: строго HH:MM либо голый час.
+// clockPattern - the book_slot time: strictly HH:MM or a bare hour.
 var clockPattern = regexp.MustCompile(`^(\d{1,2})(?::(\d{2}))?$`)
 
-// parseRequestedAt собирает названное лидом время из аргументов book_slot в
-// поясе каталога: HH:MM либо голый час. Недоверенный ввод: нераспознанное -
-// не бронь, а ответ модели.
+// parseRequestedAt assembles the time the lead named from the book_slot arguments in
+// the catalog time zone: HH:MM or a bare hour. Untrusted input: anything unrecognized
+// is not a booking but an answer to the model.
 func parseRequestedAt(date, clock string, location *time.Location) (time.Time, bool) {
 	day, err := time.ParseInLocation(qualify.DayFormat, strings.TrimSpace(date), location)
 	if err != nil {
@@ -131,14 +131,14 @@ func parseRequestedAt(date, clock string, location *time.Location) (time.Time, b
 	return time.Date(day.Year(), day.Month(), day.Day(), hour, minute, 0, 0, location), true
 }
 
-// ParseClock разбирает время book_slot: строго HH:MM либо голый час. Одна
-// функция на агента и оценку эталонов, чтобы контракт не разошёлся.
+// ParseClock parses the book_slot time: strictly HH:MM or a bare hour. One
+// function for the agent and the golden evaluation so the contract does not drift.
 func ParseClock(clock string) (hour, minute int, ok bool) {
 	match := clockPattern.FindStringSubmatch(strings.TrimSpace(clock))
 	if match == nil {
 		return 0, 0, false
 	}
-	// Цифры гарантирует шаблон, ошибки разбора быть не может.
+	// The pattern guarantees digits, so a parse error cannot happen.
 	hour, _ = strconv.Atoi(match[1])
 	if match[2] != "" {
 		minute, _ = strconv.Atoi(match[2])
@@ -149,8 +149,8 @@ func ParseClock(clock string) (hour, minute int, ok bool) {
 	return hour, minute, true
 }
 
-// parseSlotRange читает срок лида из аргументов offer_slots: начало дня
-// каждой границы. Мусор даёт нулевую границу - подбор идёт от ближайших окон.
+// parseSlotRange reads the lead's time window from the offer_slots arguments: start of day
+// of each bound. Garbage yields a zero bound and the selection starts from the nearest windows.
 func parseSlotRange(args string, location *time.Location) (from, until time.Time) {
 	var wire struct {
 		NotEarlierThan string `json:"not_earlier_than"`

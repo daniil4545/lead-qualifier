@@ -6,12 +6,12 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/qualify"
 )
 
-// render подставляет значения в текст каталога: пары «{ключ}», значение.
+// render substitutes values into a catalog text: pairs of "{key}", value.
 func render(template string, pairs ...string) string {
 	return strings.NewReplacer(pairs...).Replace(template)
 }
 
-// withReply ставит реплику модели перед готовым текстом кода.
+// withReply puts the model's reply before the ready code text.
 func withReply(reply, text string) string {
 	if strings.TrimSpace(reply) == "" {
 		return text
@@ -26,13 +26,13 @@ func joinLines(first, second string) string {
 	return first + "\n" + second
 }
 
-// leadNote - заметка в сделку: что случилось и что известно о лиде.
+// leadNote - a note on the deal: what happened and what is known about the lead.
 func (w *Worker) leadNote(input qualify.DecisionInput, event string) string {
 	return "Квалификатор: " + event + ". " + w.factsSummary(input.Case.Facts)
 }
 
-// factsSummary - собранные факты для менеджера. Коды ниши заменены именами
-// каталога: латиница в карточке менеджеру ничего не говорит.
+// factsSummary - the collected facts for the manager. Niche codes are replaced with catalog
+// names: Latin codes in a manager card say nothing.
 func (w *Worker) factsSummary(facts qualify.Facts) string {
 	value := func(key string) string {
 		if text := facts.Value(key); text != "" {

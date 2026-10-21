@@ -1,6 +1,6 @@
-// Команда prompteval прогоняет эталоны каталога через живую модель по n раз и
-// печатает отчёт: доля прошедших, классы расхождений, опасные исходы. В базу
-// не пишет, только исходящие вызовы к модели.
+// Command prompteval runs the catalog golden fixtures through a live model n times each and
+// prints a report: pass rate, divergence classes, unsafe outcomes. It does not write to the
+// database, only outgoing calls to the model.
 package main
 
 import (
@@ -31,7 +31,7 @@ func main() {
 	model := flag.String("model", "", "model override; empty - OPENROUTER_MODEL or catalog model")
 	flag.Parse()
 
-	// Логи хода уходят в stderr только от предупреждений: отчёт читается в stdout.
+	// Turn logs go to stderr only from warnings: the report is read on stdout.
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn})))
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -87,8 +87,8 @@ func run(ctx context.Context, opts options) error {
 				return ctx.Err()
 			}
 			if err != nil {
-				// Причину транспортного сбоя (429, 402, таймаут) видно только здесь:
-				// в отчёте это один класс transport_error.
+				// The cause of a transport failure (429, 402, timeout) is visible only here:
+				// in the report it is a single transport_error class.
 				fmt.Fprintf(os.Stderr, "prompteval: transport error on %s run %d: %v\n", fixture.CaseID, attempt, err)
 				entry.runs = append(entry.runs, runResult{transport: true})
 				continue
@@ -107,8 +107,8 @@ func run(ctx context.Context, opts options) error {
 			return err
 		}
 	}
-	// Критерий «без технических сбоев»: прогон с упавшим транспортом не
-	// меряет промпт, и CI обязан это увидеть.
+	// The "no technical failures" criterion: a run with a failed transport does not
+	// measure the prompt, and CI must see that.
 	if report.TransportErrors > 0 {
 		return fmt.Errorf("%d runs failed on transport", report.TransportErrors)
 	}
@@ -122,8 +122,8 @@ func promptsLabel(opts options) string {
 	return filepath.Join(opts.catalogDir, "prompts")
 }
 
-// filterFixtures отбирает эталоны по списку glob через запятую; пустой список
-// пропускает всё, пустой результат - ошибка.
+// filterFixtures selects fixtures by a comma-separated list of globs; an empty list
+// passes everything, an empty result is an error.
 func filterFixtures(all []eval.Fixture, pattern string) ([]eval.Fixture, error) {
 	var patterns []string
 	for _, part := range strings.Split(pattern, ",") {

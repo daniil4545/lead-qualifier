@@ -8,11 +8,11 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/qualify"
 )
 
-// trustedContext - то, что код знает о кейсе, одним user-сообщением перед
-// последней репликой лида. Время и цену печатает Go, модель их только повторяет.
+// trustedContext - what the code knows about the case, as one user message before
+// the lead's last message. The code prints time and price, the model only repeats them.
 type trustedContext struct {
 	Today string `json:"today"`
-	// LeadName идёт всегда, пустой строкой тоже: без ключа модель додумывает имя.
+	// LeadName is always present, even as an empty string: without the key the model invents a name.
 	LeadName     string         `json:"lead_name"`
 	CaseStatus   qualify.Status `json:"case_status"`
 	CurrentFacts qualify.Facts  `json:"current_facts"`
@@ -24,9 +24,9 @@ type trustedContext struct {
 	OfferedSlots []string       `json:"offered_slots,omitempty"`
 }
 
-// buildMessages собирает промпт хода: system, заранее выданный раздел базы,
-// история и доверенный контекст перед последним входящим. System и выдержка
-// одинаковы у всех лидов - префикс кэшируется провайдером.
+// buildMessages assembles the turn prompt: system, a knowledge base section issued
+// in advance, history and trusted context before the last incoming message. System and the excerpt
+// are the same for all leads, so the prefix is cached by the provider.
 func (c *Client) buildMessages(input qualify.DecisionInput) ([]message, error) {
 	facts := input.Case.Facts.Known()
 	for _, hidden := range []string{"niche", "niche_off", "niche_of"} {

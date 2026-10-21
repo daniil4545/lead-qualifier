@@ -1,6 +1,6 @@
-// Package config читает окружение и каталог клиента и проверяет их при старте.
-// Каталог - папка с config.json, texts.json, промптами и базой знаний: всё, что
-// отличает одну инсталляцию от другой, живёт там, а не в коде.
+// Package config reads the environment and the customer catalog and validates them at start.
+// A catalog is a folder with config.json, texts.json, prompts and a knowledge base: everything that
+// differs between one installation and another lives there, not in the code.
 package config
 
 import (
@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// Config - окружение процесса плюс разобранный каталог.
+// Config - the process environment plus the parsed catalog.
 type Config struct {
 	DatabaseURL string
 	CatalogDir  string
@@ -21,8 +21,8 @@ type Config struct {
 	Catalog     Catalog
 }
 
-// OpenRouter - доступ к модели. Ключ приходит только из окружения, модель по
-// умолчанию - из каталога, переменная окружения её переопределяет.
+// OpenRouter - model access. The key comes only from the environment, the default model
+// is from the catalog, and an environment variable overrides it.
 type OpenRouter struct {
 	APIKey              string
 	URL                 string
@@ -42,8 +42,8 @@ const (
 	maxMeetingMinutes = 24 * 60
 )
 
-// Load собирает конфигурацию из окружения и каталога. Ошибка любого шага -
-// отказ старта: сервис с битым каталогом назвал бы лиду чужую цену или время.
+// Load builds the configuration from the environment and the catalog. An error at any step is
+// a startup refusal: a service with a broken catalog would name a wrong price or time to the lead.
 func Load() (Config, error) {
 	cfg := Config{
 		DatabaseURL: strings.TrimSpace(os.Getenv("DATABASE_URL")),
@@ -63,8 +63,8 @@ func Load() (Config, error) {
 	return cfg, nil
 }
 
-// LoadOpenRouter - доступ к модели из окружения; модель по умолчанию берётся
-// из каталога. Нужен и сервису, и prompteval, которому база не нужна.
+// LoadOpenRouter - model access from the environment; the default model is taken
+// from the catalog. Needed by both the service and prompteval, which does not need a database.
 func LoadOpenRouter(catalog Catalog) (OpenRouter, error) {
 	cfg := OpenRouter{
 		APIKey:              strings.TrimSpace(os.Getenv("OPENROUTER_API_KEY")),
@@ -93,8 +93,8 @@ func envDefault(name, fallback string) string {
 	return fallback
 }
 
-// Catalog - описание клиента: компания, персона, расписание, тарифы, ниши,
-// менеджеры и тексты. Location заполняется при загрузке из Timezone.
+// Catalog - the customer description: company, persona, schedule, tariffs, niches,
+// managers and texts. Location is filled at load time from Timezone.
 type Catalog struct {
 	Company        string          `json:"company"`
 	Persona        Persona         `json:"persona"`
@@ -113,7 +113,7 @@ type Catalog struct {
 	Location *time.Location `json:"-"`
 }
 
-// Persona - от чьего имени пишет бот. Род нужен промпту: формы глаголов о себе.
+// Persona - on whose behalf the bot writes. The gender is needed by the prompt: verb forms about oneself.
 type Persona struct {
 	Name   string `json:"name"`
 	Gender string `json:"gender"`
@@ -124,29 +124,29 @@ const (
 	GenderFemale = "female"
 )
 
-// Tariff - уровень цены по выручке лида. Threshold - нижняя граница выручки в
-// рублях в месяц, включительно; Price - цена тарифа в рублях.
+// Tariff - a price level by the lead's revenue. Threshold is the lower bound of revenue in
+// rubles per month, inclusive; Price is the tariff price in rubles.
 type Tariff struct {
 	Name      string `json:"name"`
 	Threshold int64  `json:"threshold"`
 	Price     int64  `json:"price"`
 }
 
-// Segment - целевое направление лида. Threshold - минимальная выручка для
-// встречи; ноль значит минимальный порог тарифов.
+// Segment - a target direction of the lead. Threshold is the minimum revenue for a
+// meeting; zero means the minimum tariff threshold.
 type Segment struct {
 	Code      string `json:"code"`
 	Name      string `json:"name"`
 	Threshold int64  `json:"threshold"`
 }
 
-// RefusalReason - повод отказа по нише: код классификатора и имя для менеджера.
+// RefusalReason - a niche refusal reason: the classifier code and a name for the manager.
 type RefusalReason struct {
 	Code string `json:"code"`
 	Name string `json:"name"`
 }
 
-// Manager - кто проводит встречи. Пустой WorkHours - общие часы каталога.
+// Manager - who runs the meetings. An empty WorkHours means the common catalog hours.
 type Manager struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
@@ -154,21 +154,21 @@ type Manager struct {
 	WorkHours WorkHours `json:"work_hours"`
 }
 
-// WorkHours - рабочие окна по дням недели: {"mon": ["10:00", "18:00"]}. День
-// без ключа нерабочий.
+// WorkHours - working windows by weekday: {"mon": ["10:00", "18:00"]}. A day
+// without a key is non-working.
 type WorkHours map[string][2]string
 
-// WeekdayKeys - ключи WorkHours в порядке time.Weekday (Sunday = 0).
+// WeekdayKeys - the WorkHours keys in time.Weekday order (Sunday = 0).
 var WeekdayKeys = [7]string{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
 
-// Window - рабочее окно дня в часах и минутах местного времени каталога.
+// Window - a working window of a day in hours and minutes of the catalog's local time.
 type Window struct {
 	StartHour, StartMinute int
 	EndHour, EndMinute     int
 }
 
-// ParseWindows разбирает WorkHours в окна по дням недели. Любая ошибка формата
-// отбрасывает расписание целиком: частично прочитанное опаснее отсутствующего.
+// ParseWindows parses WorkHours into windows by weekday. Any format error
+// discards the whole schedule: a partially read one is more dangerous than a missing one.
 func ParseWindows(hours WorkHours) (map[time.Weekday]Window, error) {
 	windows := make(map[time.Weekday]Window, len(hours))
 	for key, pair := range hours {
@@ -207,7 +207,7 @@ func parseWindow(start, end string) (Window, error) {
 	return window, nil
 }
 
-// LoadCatalog читает config.json и texts.json каталога и проверяет инварианты.
+// LoadCatalog reads config.json and texts.json of the catalog and checks the invariants.
 func LoadCatalog(dir string) (Catalog, error) {
 	var catalog Catalog
 	if err := readJSON(filepath.Join(dir, "config.json"), &catalog); err != nil {
@@ -240,7 +240,7 @@ func readJSON(path string, target any) error {
 	return nil
 }
 
-// MinTariffThreshold - нижний порог тарифов: ниже него цены у лида нет.
+// MinTariffThreshold - the lowest tariff threshold: below it the lead has no price.
 func (c Catalog) MinTariffThreshold() int64 {
 	lowest := int64(0)
 	for index, tariff := range c.Tariffs {
@@ -251,7 +251,7 @@ func (c Catalog) MinTariffThreshold() int64 {
 	return lowest
 }
 
-// Validate проверяет инварианты каталога, которые код иначе принял бы молча.
+// Validate checks the catalog invariants that the code would otherwise accept silently.
 func (c Catalog) Validate() error {
 	checks := []func() error{c.validateBasics, c.validateTariffs, c.validateSegments,
 		c.validateManagers, c.Texts.validate}
@@ -273,8 +273,8 @@ func (c Catalog) validateBasics() error {
 	if c.Persona.Gender != GenderMale && c.Persona.Gender != GenderFemale {
 		return fmt.Errorf("persona.gender must be %s or %s", GenderMale, GenderFemale)
 	}
-	// Длительность встречи - шаг сетки окон от начала рабочего дня. Снизу
-	// граница: при минутной сетке в контекст модели ушли бы сотни окон.
+	// Meeting duration is the step of the window grid from the start of the working day. A lower
+	// bound exists: with a one-minute grid hundreds of windows would go into the model context.
 	if c.MeetingMinutes < minMeetingMinutes || c.MeetingMinutes > maxMeetingMinutes {
 		return fmt.Errorf("meeting_minutes must be between %d and %d, got %d",
 			minMeetingMinutes, maxMeetingMinutes, c.MeetingMinutes)
@@ -307,8 +307,8 @@ func (c Catalog) validateTariffs() error {
 	return nil
 }
 
-// validateSegments держит правило старта: порог сегмента не ниже минимального
-// порога тарифов, иначе гейт позвал бы на встречу лида, которому нечего продать.
+// validateSegments holds the start rule: a segment threshold is not below the minimum
+// tariff threshold, otherwise the gate would invite to a meeting a lead who has nothing to buy.
 func (c Catalog) validateSegments() error {
 	if len(c.Segments) == 0 {
 		return errors.New("at least one segment is required")

@@ -14,8 +14,8 @@ import (
 
 var zeroTime time.Time
 
-// busy - занятость менеджеров по броням базы на горизонте подбора. Начало -
-// сутки назад: встреча, начавшаяся раньше now, ещё может занимать окно.
+// busy - manager occupancy by database bookings over the selection horizon. The start is
+// a day back: a meeting that began before now can still occupy a window.
 func (w *Worker) busy(ctx context.Context, now time.Time) (calendar.Busy, error) {
 	meetings, err := w.store.BusyMeetings(ctx, now.Add(-24*time.Hour), now.Add(calendar.Horizon+24*time.Hour))
 	if err != nil {
@@ -28,9 +28,9 @@ func (w *Worker) busy(ctx context.Context, now time.Time) (calendar.Busy, error)
 	return busy, nil
 }
 
-// validRange приводит срок лида к отрезку подбора: прошлое снимается, верхняя
-// граница включает названный день целиком, перевёрнутый отрезок снимается
-// весь. Срок пришёл из вывода модели, опечатка не должна давать пустой подбор.
+// validRange brings the lead's window to a selection range: the past is dropped, the upper
+// bound includes the named day entirely, an inverted range is dropped
+// entirely. The window came from model output, a typo must not give an empty selection.
 func (w *Worker) validRange(now, from, until time.Time) (time.Time, time.Time) {
 	if !from.After(now) {
 		from = zeroTime
@@ -44,9 +44,9 @@ func (w *Worker) validRange(now, from, until time.Time) (time.Time, time.Time) {
 	return from, until
 }
 
-// offerSlots подбирает окна и планирует их показ. reply - реплика модели, она
-// идёт первой строкой; prefix - строка кода перед списком (занятый час,
-// перехваченное окно).
+// offerSlots selects windows and plans showing them. reply is the model's reply, it
+// goes first; prefix is the code's line before the list (a busy hour,
+// an intercepted window).
 func (w *Worker) offerSlots(ctx context.Context, input qualify.DecisionInput, reply, prefix string, from, until time.Time) (store.Decision, store.Plan, error) {
 	now := w.now()
 	busy, err := w.busy(ctx, now)
@@ -79,9 +79,9 @@ func (w *Worker) offerSlots(ctx context.Context, input qualify.DecisionInput, re
 	}, nil
 }
 
-// bookSlot бронирует названный лидом час, если он свободен у кого-то из
-// менеджеров. Занятый час - корректирующий показ окон с того же дня. Саму
-// бронь пишет транзакция решения, двойную запись отбивает база.
+// bookSlot books the hour the lead named if it is free for any of the
+// managers. A busy hour gives a corrective showing of windows from the same day. The booking
+// itself is written by the decision transaction, a double entry is rejected by the database.
 func (w *Worker) bookSlot(ctx context.Context, input qualify.DecisionInput, requested time.Time) (store.Decision, store.Plan, error) {
 	now := w.now()
 	busy, err := w.busy(ctx, now)
@@ -113,8 +113,8 @@ func (w *Worker) bookSlot(ctx context.Context, input qualify.DecisionInput, requ
 	}, nil
 }
 
-// slotOfferText - список окон строкой на день: подряд идущие окна сливаются
-// в диапазон начал, иначе список из 15 времён читается простынёй.
+// slotOfferText - the list of windows as a line per day: consecutive windows merge
+// into a range of starts, otherwise a list of 15 times reads as a wall of text.
 func (w *Worker) slotOfferText(slots []qualify.OfferedSlot, reply, prefix string) string {
 	if reply == "" && prefix == "" {
 		prefix = w.catalog.Texts.SlotsHeadline
@@ -139,9 +139,9 @@ func (w *Worker) slotOfferText(slots []qualify.OfferedSlot, reply, prefix string
 	return text.String()
 }
 
-// startRanges - «10:00, 12:00-15:30 включительно»: окна, идущие друг за
-// другом без разрыва, одним диапазоном начал; последнее время - последний
-// возможный старт.
+// startRanges - "10:00, 12:00-15:30 inclusive": windows going one after
+// another without a gap as one range of starts; the last time is the last
+// possible start.
 func startRanges(slots []qualify.OfferedSlot, location *time.Location) string {
 	clock := func(at time.Time) string { return at.In(location).Format("15:04") }
 	var pieces []string

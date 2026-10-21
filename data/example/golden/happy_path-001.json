@@ -28,5 +28,5 @@
   "expected_fact_parts": {},
   "expected_tool_args": {},
   "forbidden_response": [],
-  "reason": "Лид назвал все пять фактов одной репликой: сохранить их и вызвать complete, решение о встрече примет код."
+  "reason": "The lead named all five facts in one message: save them and call complete, the code decides on the meeting."
 }

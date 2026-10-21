@@ -28,5 +28,5 @@
   "expected_fact_parts": {},
   "expected_tool_args": {},
   "forbidden_response": [],
-  "reason": "Роль названа, владение отрицается прямо: is_owner = false; должность собственником не делает. Город не назван - спросить его, без complete."
+  "reason": "The role is named, ownership is denied directly: is_owner = false; a job title does not make an owner. The city is not named: ask for it, no complete."
 }

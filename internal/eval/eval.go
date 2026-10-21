@@ -1,6 +1,6 @@
-// Package eval - эталоны диалога и оценка хода агента по ним. Эталон - один
-// ход: история, доверенный снимок кейса и ожидаемый исход. Пакет общий у
-// офлайн-проверки эталонов и prompteval.
+// Package eval - dialog golden fixtures and evaluation of an agent turn against them. A fixture is one
+// turn: history, a trusted case snapshot and the expected outcome. The package is shared by
+// the offline fixture check and prompteval.
 package eval
 
 import (
@@ -19,47 +19,47 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/qualify"
 )
 
-// Fixture - эталон одного хода.
+// Fixture - a golden fixture of one turn.
 type Fixture struct {
 	CaseID string `json:"case_id"`
-	// Class - класс сценария из спеки: по нему строится отчёт prompteval.
+	// Class - the scenario class from the spec: the prompteval report is built by it.
 	Class      string         `json:"class"`
 	CaseStatus qualify.Status `json:"case_status"`
-	// Now - момент хода в поясе каталога: от него модель считает даты.
+	// Now - the turn moment in the catalog time zone: the model counts dates from it.
 	Now          time.Time       `json:"now"`
 	LeadName     string          `json:"lead_name"`
 	Messages     []Message       `json:"messages"`
 	TrustedFacts qualify.Facts   `json:"trusted_facts"`
 	OfferedSlots []OfferedSlot   `json:"offered_slots"`
 	Meeting      *FixtureMeeting `json:"meeting"`
-	// ExpectedAction - исход хода, см. Action.
+	// ExpectedAction - the turn outcome, see Action.
 	ExpectedAction string `json:"expected_action"`
-	// ExpectedFacts - факты после хода: null - факта быть не должно, строка -
-	// смысл, который обязан быть в значении (или ExpectedFactParts), bool -
-	// точное значение.
+	// ExpectedFacts - facts after the turn: null means the fact must not exist, a string is
+	// the meaning that must be in the value (or ExpectedFactParts), bool is
+	// the exact value.
 	ExpectedFacts     map[string]any      `json:"expected_facts"`
 	ExpectedFactParts map[string][]string `json:"expected_fact_parts"`
-	// ExpectedToolArgs - аргументы завершившего ход инструмента, строками.
+	// ExpectedToolArgs - arguments of the tool that ended the turn, as strings.
 	ExpectedToolArgs map[string]string `json:"expected_tool_args"`
-	// ForbiddenResponse - подстроки, которых не должно быть в тексте лиду.
+	// ForbiddenResponse - substrings that must not be in the text to the lead.
 	ForbiddenResponse []string `json:"forbidden_response"`
 	Reason            string   `json:"reason"`
 }
 
-// Message - реплика истории: author lead либо bot.
+// Message - a history message: author lead or bot.
 type Message struct {
 	Author string `json:"author"`
 	Text   string `json:"text"`
 }
 
-// OfferedSlot - окно, уже показанное лиду.
+// OfferedSlot - a window already shown to the lead.
 type OfferedSlot struct {
 	ManagerID string    `json:"manager_id"`
 	Start     time.Time `json:"start"`
 	End       time.Time `json:"end"`
 }
 
-// FixtureMeeting - назначенная встреча кейса.
+// FixtureMeeting - the case's appointed meeting.
 type FixtureMeeting struct {
 	ManagerID string    `json:"manager_id"`
 	Manager   string    `json:"manager"`
@@ -67,11 +67,11 @@ type FixtureMeeting struct {
 	End       time.Time `json:"end"`
 }
 
-// Actions - словарь исходов хода.
+// Actions - the dictionary of turn outcomes.
 var Actions = []string{"agent_text", "complete", "manual_review", "offer_slots", "book_slot", "stop_contact", "refuse"}
 
-// LoadFixtures строго читает все *.json папки в лексикографическом порядке.
-// Неизвестное поле - ошибка: опечатка в эталоне иначе молча выключила бы проверку.
+// LoadFixtures strictly reads all *.json of the folder in lexicographic order.
+// An unknown field is an error: a typo in a fixture would otherwise silently disable a check.
 func LoadFixtures(dir string) ([]Fixture, error) {
 	paths, err := filepath.Glob(filepath.Join(dir, "*.json"))
 	if err != nil {
@@ -111,7 +111,7 @@ func loadFixture(path string) (Fixture, error) {
 	return fixture, nil
 }
 
-// DecisionInput собирает вход хода из эталона.
+// DecisionInput builds the turn input from a fixture.
 func (f Fixture) DecisionInput(caseID int64) qualify.DecisionInput {
 	status := f.CaseStatus
 	if status == "" {
@@ -148,7 +148,7 @@ func (f Fixture) DecisionInput(caseID int64) qualify.DecisionInput {
 	return input
 }
 
-// Action - исход хода словами эталона.
+// Action - the turn outcome in the fixture's words.
 func Action(turn agent.Turn) string {
 	switch turn.Terminal {
 	case agent.TerminalComplete:
@@ -167,13 +167,13 @@ func Action(turn agent.Turn) string {
 	return "agent_text"
 }
 
-// Issue - одно расхождение хода с эталоном.
+// Issue - one divergence of a turn from the fixture.
 type Issue struct {
 	Class  string
 	Detail string
 }
 
-// Классы расхождений. unsafe из них - те, где дефект уходит наружу.
+// Divergence classes. The unsafe ones are those where the defect goes outward.
 const (
 	IssueWrongAction   = "wrong_action"
 	IssueWrongToolArgs = "wrong_tool_args"
@@ -184,8 +184,8 @@ const (
 	IssueCriticLeak    = "critic_leak"
 )
 
-// Evaluate сравнивает наблюдаемый исход хода с эталоном. Пустой ответ - ход
-// прошёл.
+// Evaluate compares the observed turn outcome with the fixture. An empty answer means the turn
+// passed.
 func Evaluate(fixture Fixture, turn agent.Turn) []Issue {
 	var issues []Issue
 	lowered := strings.ToLower(turn.FinalText)
@@ -210,9 +210,9 @@ func Evaluate(fixture Fixture, turn agent.Turn) []Issue {
 	return append(issues, evaluateFacts(fixture, turn.Facts)...)
 }
 
-// Unsafe - дефект ушёл бы наружу: выдуманный факт, запрещённый текст, текст в
-// обход guard или критика, решение по неверному снимку фактов. Расхождение
-// действия с меткой - вопрос качества, а не вреда.
+// Unsafe - the defect would go outward: an invented fact, forbidden text, text
+// bypassing the guard or critic, a decision on a wrong facts snapshot. An action
+// divergence from the label is a quality question, not harm.
 func Unsafe(action string, issues []Issue) bool {
 	snapshotDefect := false
 	for _, issue := range issues {
@@ -254,7 +254,7 @@ func evaluateToolArgs(fixture Fixture, turn agent.Turn) []Issue {
 	return issues
 }
 
-// normalizeArg сводит время к HH:MM: голый час равен HH:00.
+// normalizeArg reduces a time to HH:MM: a bare hour equals HH:00.
 func normalizeArg(value string) string {
 	value = strings.TrimSpace(value)
 	hour, minute, ok := agent.ParseClock(value)

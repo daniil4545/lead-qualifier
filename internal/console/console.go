@@ -1,4 +1,4 @@
-// Package console - транспорт демо: лид пишет в stdin, бот отвечает в stdout.
+// Package console - the demo transport: the lead writes to stdin, the bot answers on stdout.
 package console
 
 import (
@@ -18,8 +18,8 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/qualify"
 )
 
-// Console печатает сообщения бота своего лида. Запись под мьютексом: бот и CRM
-// пишут из цикла доставки, приглашение ввода - из цикла чтения.
+// Console prints the bot messages of its lead. Writes are under a mutex: the bot and the CRM
+// write from the delivery loop, the input prompt from the read loop.
 type Console struct {
 	out   io.Writer
 	mu    sync.Mutex
@@ -27,15 +27,15 @@ type Console struct {
 	peer  string
 }
 
-// errForeignPeer - сообщение лиду прошлой сессии: в этот терминал оно не идёт.
+// errForeignPeer - a message to a lead of a previous session: it does not go to this terminal.
 var errForeignPeer = errors.New("peer is not in this console session")
 
-// New создаёт транспорт поверх out.
+// New creates a transport on top of out.
 func New(out io.Writer) *Console {
 	return &Console{out: out}
 }
 
-// Send печатает сообщение бота и возвращает его номер в сессии.
+// Send prints a bot message and returns its number in the session.
 func (c *Console) Send(_ context.Context, peerRef, text string) (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -49,19 +49,19 @@ func (c *Console) Send(_ context.Context, peerRef, text string) (string, error) 
 	return fmt.Sprintf("console-%d", c.count), nil
 }
 
-// Write - печать фейковой CRM через тот же мьютекс.
+// Write - printing of the fake CRM through the same mutex.
 func (c *Console) Write(data []byte) (int, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.out.Write(data)
 }
 
-// idleTimeout - сколько демо ждёт последний ответ после конца ввода.
+// idleTimeout - how long the demo waits for the last reply after the input ends.
 const idleTimeout = 3 * time.Minute
 
-// Run ведёт демо: спрашивает имя лида, заводит заявку в CRM и кейс, дальше
-// каждая строка stdin - реплика лида. Конец ввода завершает демо, когда бот
-// ответил на последнюю реплику.
+// Run drives the demo: asks for the lead's name, creates a request in the CRM and a case, then
+// each stdin line is a lead message. The end of input ends the demo once the bot
+// has answered the last message.
 func Run(ctx context.Context, worker *dialog.Worker, leads crm.CRM, console *Console, in io.Reader) error {
 	scanner := bufio.NewScanner(in)
 	if _, err := fmt.Fprint(console, "Имя лида: "); err != nil {
@@ -123,7 +123,7 @@ func waitIdle(ctx context.Context, worker *dialog.Worker, peerRef string) error 
 	}
 }
 
-// newPeerRef - адрес лида в сессии: каждое демо - новый лид.
+// newPeerRef - the lead's address in the session: each demo is a new lead.
 func newPeerRef() (string, error) {
 	var raw [6]byte
 	if _, err := rand.Read(raw[:]); err != nil {

@@ -19,8 +19,8 @@ func (c failingClassifier) ClassifyNiche(context.Context, NicheInput) (qualify.N
 	return qualify.NicheVerdict{}, c.failure
 }
 
-// Отказ по сбою классификатора запрещён: постоянный сбой даёт неподтверждённый
-// профиль и открытый гейт, повторяемый уходит наверх и переигрывает ход.
+// A refusal because of a classifier failure is forbidden: a permanent failure gives an unconfirmed
+// profile and an open gate, a repeatable one goes up and replays the turn.
 func TestEnsureNiche_ClassifierFailure(t *testing.T) {
 	t.Parallel()
 	fx := loadFixture(t)
@@ -51,11 +51,11 @@ func TestEnsureNiche_ClassifierFailure(t *testing.T) {
 type nicheCase struct {
 	service string
 	want    qualify.Gate
-	segment string // код сегмента для offer; пусто у off_profile
+	segment string // segment code for offer; empty for off_profile
 }
 
-// loadNicheCases читает niche_cases.tsv: описание, исход гейта, код сегмента
-// каталога или unclear (пусто у off_profile), пояснение.
+// loadNicheCases reads niche_cases.tsv: description, gate outcome, catalog segment code
+// or unclear (empty for off_profile), explanation.
 func loadNicheCases(t *testing.T, catalog config.Catalog) []nicheCase {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(catalogDir, "niche_cases.tsv"))
@@ -80,7 +80,7 @@ func loadNicheCases(t *testing.T, catalog config.Catalog) []nicheCase {
 			t.Fatalf("line %d: duplicate description %q", i+1, fields[0])
 		}
 		segment := fields[2]
-		// unclear - код неподтверждённого профиля: встреча без сегмента каталога.
+		// unclear is the code of an unconfirmed profile: a meeting without a catalog segment.
 		known := segment == qualify.NicheUnclear ||
 			slices.ContainsFunc(catalog.Segments, func(s config.Segment) bool { return s.Code == segment })
 		if (gate == qualify.GateOffer) != known || gate == qualify.GateOffProfile && segment != "" {
@@ -93,7 +93,7 @@ func loadNicheCases(t *testing.T, catalog config.Catalog) []nicheCase {
 	return cases
 }
 
-// Офлайн-проверка набора ниши: формат и оба исхода гейта представлены.
+// Offline check of the niche set: the format is valid and both gate outcomes are present.
 func TestNicheCases_Format(t *testing.T) {
 	t.Parallel()
 	outcomes := map[qualify.Gate]int{}
@@ -105,9 +105,9 @@ func TestNicheCases_Format(t *testing.T) {
 	}
 }
 
-// Живой тест классификатора ниши: каждое описание при выручке выше всех
-// порогов даёт исход гейта из набора, а offer - ожидаемый сегмент.
-// Нужны LQ_LIVE_MODEL=1 и OPENROUTER_API_KEY.
+// Live niche classifier test: each description with revenue above all
+// thresholds yields a gate outcome from the set, and offer yields the expected segment.
+// Needs LQ_LIVE_MODEL=1 and OPENROUTER_API_KEY.
 func TestNicheClassifierLive(t *testing.T) {
 	if testing.Short() || os.Getenv("LQ_LIVE_MODEL") != "1" || os.Getenv("OPENROUTER_API_KEY") == "" {
 		t.Skip("live model test: set LQ_LIVE_MODEL=1 and OPENROUTER_API_KEY, run without -short")

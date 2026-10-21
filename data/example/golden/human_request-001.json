@@ -30,5 +30,5 @@
     "reason": "user_request"
   },
   "forbidden_response": [],
-  "reason": "Прямая просьба позвать человека: escalate с reason user_request."
+  "reason": "A direct request for a human: escalate with reason user_request."
 }

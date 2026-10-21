@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// Старт проверяет: порог сегмента не ниже минимального порога тарифов,
-// иначе гейт позвал бы на встречу лида, которому нечего продать.
+// Start checks: a segment threshold is not below the minimum tariff threshold,
+// otherwise the gate would invite to a meeting a lead who has nothing to buy.
 func TestValidate_SegmentThresholdBelowTariffs(t *testing.T) {
 	t.Parallel()
 	catalog, err := LoadCatalog("../../data/example")
@@ -26,7 +26,7 @@ func TestValidate_SegmentThresholdBelowTariffs(t *testing.T) {
 	}
 }
 
-// Встреча в каталоге от 15 минут: каталог с 14 не загружается, с 15 - да.
+// A meeting in the catalog from 15 minutes: a catalog with 14 does not load, with 15 it does.
 func TestLoadCatalog_MeetingMinutesFloor(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -59,8 +59,8 @@ func TestLoadCatalog_MeetingMinutesFloor(t *testing.T) {
 	}
 }
 
-// Модель по умолчанию из каталога, окружение её переопределяет; ключ и адрес
-// модели - только из окружения. Не параллельный: меняет окружение процесса.
+// The default model comes from the catalog, the environment overrides it; the key and the model
+// address come only from the environment. Not parallel: it changes the process environment.
 func TestLoadOpenRouter(t *testing.T) {
 	catalog, err := LoadCatalog("../../data/example")
 	if err != nil {

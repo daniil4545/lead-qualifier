@@ -12,8 +12,8 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/qualify"
 )
 
-// CriticVerdict - вердикт критика по черновику. Цитаты проблем идут только в
-// аудит решения, не в лог.
+// CriticVerdict - the critic's verdict on a draft. Problem quotes go only into the
+// decision audit, not the log.
 type CriticVerdict struct {
 	OK       bool
 	Problems []CriticProblem
@@ -48,8 +48,8 @@ var criticSchema = json.RawMessage(`{
 	"required": ["ok", "problems"]
 }`)
 
-// criticPayload - вход критика. TariffPrice и MeetingTimes посчитал код, их
-// повторение в черновике легитимно.
+// criticPayload - the critic's input. TariffPrice and MeetingTimes were computed by the code, so
+// repeating them in the draft is legitimate.
 type criticPayload struct {
 	Candidate       string   `json:"candidate"`
 	KBFragments     []string `json:"kb_fragments"`
@@ -58,9 +58,9 @@ type criticPayload struct {
 	MeetingTimes    []string `json:"meeting_times,omitempty"`
 }
 
-// criticCheck - один strict-JSON вызов критика. Транспортный сбой уходит
-// наверх ExternalFailure (ход переигрывается), непонятный ответ - обычной
-// ошибкой (critic_error).
+// criticCheck - one strict-JSON critic call. A transport failure goes up as
+// ExternalFailure (the turn is replayed), an unintelligible answer as an ordinary
+// error (critic_error).
 func (c *Client) criticCheck(ctx context.Context, caseID int64, payload criticPayload) (CriticVerdict, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -94,13 +94,13 @@ func (c *Client) criticCheck(ctx context.Context, caseID int64, payload criticPa
 		}
 		verdict.Problems = append(verdict.Problems, CriticProblem{Category: category, Sentence: problem.Sentence})
 	}
-	// OK выводится из пустоты списка: противоречивый ответ модели не пропускает
-	// черновик с проблемами.
+	// OK is derived from the emptiness of the list: a contradictory model answer does not let
+	// a draft with problems through.
 	verdict.OK = len(verdict.Problems) == 0
 	return verdict, nil
 }
 
-// NicheInput - вход классификатора: услуга лида и его последние реплики.
+// NicheInput - the classifier input: the lead's service and their latest messages.
 type NicheInput struct {
 	CaseID      int64
 	Service     string
@@ -123,9 +123,9 @@ type nicheCode struct {
 	Name string `json:"name"`
 }
 
-// ClassifyNiche раскладывает услугу лида в коды каталога. Отдельный вызов, а
-// не поле save_facts: модель диалога правит факты каждым ходом и переписала
-// бы код под контекст беседы. Ответ - недоверенный ввод, коды сверяет Rules.
+// ClassifyNiche maps the lead's service to catalog codes. A separate call rather than
+// a save_facts field: the dialog model edits facts every turn and would have rewritten
+// the code to fit the conversation. The answer is untrusted input, Rules checks the codes.
 func (c *Client) ClassifyNiche(ctx context.Context, input NicheInput) (qualify.NicheVerdict, error) {
 	payload := struct {
 		Service     string      `json:"service"`
@@ -166,15 +166,15 @@ func (c *Client) ClassifyNiche(ctx context.Context, input NicheInput) (qualify.N
 	}, nil
 }
 
-// NicheClassifier - кто раскладывает услугу лида в коды каталога.
+// NicheClassifier - whatever maps the lead's service to catalog codes.
 type NicheClassifier interface {
 	ClassifyNiche(ctx context.Context, input NicheInput) (qualify.NicheVerdict, error)
 }
 
-// EnsureNiche - шаг «узнать профиль лида»: вердикт ложится в факты хода и
-// считается один раз на значение услуги. Повторяемый сбой уходит наверх и
-// переигрывает ход; постоянный и непонятный ответ дают неподтверждённый
-// профиль - отказ по сбою классификатора запрещён.
+// EnsureNiche - the "learn the lead's profile" step: the verdict goes into the turn facts and
+// is computed once per service value. A repeatable failure goes up and
+// replays the turn; a permanent or unintelligible answer yields an unconfirmed
+// profile: a refusal because of a classifier failure is forbidden.
 func EnsureNiche(ctx context.Context, classifier NicheClassifier, rules qualify.Rules,
 	caseID int64, facts qualify.Facts, leadMessage string) error {
 	if qualify.NicheKnown(facts) {
@@ -197,8 +197,8 @@ func EnsureNiche(ctx context.Context, classifier NicheClassifier, rules qualify.
 	return nil
 }
 
-// trimJSONFence снимает markdown-обёртку: strict-схема её запрещает, но модели
-// судьи изредка отвечают блоком ```json.
+// trimJSONFence strips a markdown wrapper: the strict schema forbids it, but judge
+// models occasionally answer with a ```json block.
 func trimJSONFence(content string) string {
 	trimmed := strings.TrimSpace(content)
 	if !strings.HasPrefix(trimmed, "```") {

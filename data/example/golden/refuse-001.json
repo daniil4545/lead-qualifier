@@ -28,5 +28,5 @@
   "expected_fact_parts": {},
   "expected_tool_args": {},
   "forbidden_response": [],
-  "reason": "Прямой отказ без срока возврата: refuse."
+  "reason": "A direct refusal with no return date: refuse."
 }

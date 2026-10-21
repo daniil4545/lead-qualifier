@@ -12,19 +12,19 @@ import (
 	"testing"
 )
 
-// moneyUnits - именованные множители единиц денег («тыс», «млн»): их
-// объявления - не значения каталога, хотя число может совпасть с порогом.
+// moneyUnits - named multipliers of money units ("тыс", "млн"): their
+// declarations are not catalog values, although the number may coincide with a threshold.
 var moneyUnits = map[string]bool{"unitThousand": true, "unitMillion": true}
 
-// digitGroups - число внутри строки, в том числе с пробелами между разрядами.
+// digitGroups - a number inside a string, including spaces between digit groups.
 var digitGroups = regexp.MustCompile(`\d(?:[\d_]|[ \x{00A0}]\d{3})*`)
 
-// Критерий общности: значений каталога (пояс, цены, пороги, имена) в Go-коде
-// вне тестов нет. Сравниваются литералы кода и числа внутри строк, а не комментарии.
+// The generality criterion: no catalog values (time zone, prices, thresholds, names) in Go code
+// outside tests. Code literals and numbers inside strings are compared, not comments.
 func TestNoCatalogLiteralsInCode(t *testing.T) {
 	t.Parallel()
 	numbers := map[int64]string{}
-	// Пояс из спеки собирается из частей, чтобы стоп-список по дереву был пуст.
+	// The zone from the spec is assembled from parts so that the stop-list over the tree is empty.
 	texts := map[string]string{"Europe" + "/" + "Moscow": "timezone"}
 	for _, dir := range []string{"../../data/example", "../../testdata/catalog-alt"} {
 		catalog, err := LoadCatalog(dir)
@@ -80,7 +80,7 @@ func scanFile(t *testing.T, path string, source []byte, numbers map[int64]string
 	fset := token.NewFileSet()
 	var scan scanner.Scanner
 	scan.Init(fset.AddFile(path, -1, len(source)), source, nil, 0)
-	var name, previous string // два предыдущих токена: имя и «=» объявления
+	var name, previous string // two previous tokens: the name and the "=" of the declaration
 	for {
 		pos, tok, lit := scan.Scan()
 		if tok == token.EOF {

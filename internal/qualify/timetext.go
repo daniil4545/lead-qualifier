@@ -31,43 +31,43 @@ var monthsGenitive = [...]string{
 	time.December:  "декабря",
 }
 
-// SlotText - время окна для лида и для контекста модели: «четверг, 30 июля,
-// 15:00». Одна функция на все места, чтобы формат не разъехался.
+// SlotText - a window time for the lead and for the model context: "Thursday, July 30,
+// 15:00" (the format is Russian). One function for all places so the format does not drift.
 func SlotText(start time.Time, location *time.Location) string {
 	local := start.In(location)
 	return fmt.Sprintf("%s, %d %s, %02d:%02d", weekdays[local.Weekday()], local.Day(),
 		monthsGenitive[local.Month()], local.Hour(), local.Minute())
 }
 
-// DateTimeText - время внутри фразы: «30 июля в 15:00».
+// DateTimeText - a time inside a phrase: "30 July at 15:00" (Russian format).
 func DateTimeText(start time.Time, location *time.Location) string {
 	local := start.In(location)
 	return fmt.Sprintf("%d %s в %02d:%02d", local.Day(), monthsGenitive[local.Month()], local.Hour(), local.Minute())
 }
 
-// DayHeader - заголовок дня в списке окон: «четверг, 30 июля».
+// DayHeader - a day header in the window list: "Thursday, July 30".
 func DayHeader(day time.Time, location *time.Location) string {
 	local := day.In(location)
 	return fmt.Sprintf("%s, %d %s", weekdays[local.Weekday()], local.Day(), monthsGenitive[local.Month()])
 }
 
-// DayFormat - календарный день строкой: аргументы инструментов и логи.
+// DayFormat - a calendar day as a string: tool arguments and logs.
 const DayFormat = "2006-01-02"
 
-// TodayText - момент хода для модели: дата, день недели и час. Без часа модель
-// не поймёт «сегодня в 12», когда полдень уже прошёл.
+// TodayText - the turn moment for the model: date, weekday and hour. Without the hour the model
+// does not understand "today at 12" when noon has already passed.
 func TodayText(now time.Time, location *time.Location) string {
 	local := now.In(location)
 	return local.Format(DayFormat) + ", " + weekdays[local.Weekday()] + ", " + local.Format("15:04")
 }
 
-// StartOfDay - начало местных суток.
+// StartOfDay - the start of the local day.
 func StartOfDay(at time.Time, location *time.Location) time.Time {
 	local := at.In(location)
 	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, location)
 }
 
-// Rubles - сумма для людей: «12 345 ₽».
+// Rubles - an amount for people: "12 345 ₽".
 func Rubles(amount int64) string {
 	digits := fmt.Sprint(amount)
 	var text strings.Builder

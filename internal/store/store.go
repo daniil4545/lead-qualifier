@@ -1,6 +1,6 @@
-// Package store - состояние в Postgres: лиды, кейсы, сообщения, решения,
-// брони и outbox. Решение, смена статуса, бронь и действия наружу пишутся одной
-// транзакцией: сбой между ними не теряет и не дублирует эффект.
+// Package store - state in Postgres: leads, cases, messages, decisions,
+// bookings and outbox. The decision, the status change, the booking and outward actions are written in a single
+// transaction: a failure between them neither loses nor duplicates an effect.
 package store
 
 import (
@@ -22,28 +22,28 @@ import (
 var schema string
 
 var (
-	// ErrUnknownPeer - входящее от собеседника без заявки.
+	// ErrUnknownPeer - an incoming message from a peer with no lead.
 	ErrUnknownPeer = errors.New("unknown peer")
-	// ErrFrozenCase - кейс закрыт, решение к нему не применяется.
+	// ErrFrozenCase - the case is closed, a decision is not applied to it.
 	ErrFrozenCase = errors.New("case is frozen")
-	// ErrStaleDecision - пока шёл ход, пришла новая реплика: ход переигрывается
-	// уже с полным блоком.
+	// ErrStaleDecision - a new message arrived during the turn: the turn is replayed
+	// with the full block.
 	ErrStaleDecision = errors.New("decision input is stale")
-	// ErrAlreadyApplied - на этот вход решение уже применено.
+	// ErrAlreadyApplied - a decision is already applied to this input.
 	ErrAlreadyApplied = errors.New("decision already applied")
-	// ErrSlotTaken - окно менеджера заняли, пока шёл ход. Транзакция решения
-	// откатывается целиком: лид не получит подтверждение брони, которой нет.
+	// ErrSlotTaken - the manager's window was taken during the turn. The decision transaction
+	// rolls back entirely: the lead will not get a confirmation of a booking that does not exist.
 	ErrSlotTaken = errors.New("meeting slot is taken")
-	// ErrStaleOutbox - строку outbox перехватил другой проход.
+	// ErrStaleOutbox - another pass took over the outbox row.
 	ErrStaleOutbox = errors.New("outbox claim is stale")
 )
 
-// Store - доступ к базе.
+// Store - database access.
 type Store struct {
 	pool *pgxpool.Pool
 }
 
-// Open подключается к базе и проверяет соединение.
+// Open connects to the database and checks the connection.
 func Open(ctx context.Context, url string) (*Store, error) {
 	pool, err := pgxpool.New(ctx, url)
 	if err != nil {
@@ -56,12 +56,12 @@ func Open(ctx context.Context, url string) (*Store, error) {
 	return &Store{pool: pool}, nil
 }
 
-// Close закрывает пул соединений.
+// Close closes the connection pool.
 func (s *Store) Close() {
 	s.pool.Close()
 }
 
-// Migrate применяет схему. Она идемпотентна: повторный старт ничего не меняет.
+// Migrate applies the schema. It is idempotent: a repeated start changes nothing.
 func (s *Store) Migrate(ctx context.Context) error {
 	if _, err := s.pool.Exec(ctx, schema); err != nil {
 		return fmt.Errorf("apply schema: %w", err)
@@ -69,7 +69,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 	return nil
 }
 
-// Decision - применяемое решение хода. Status - статус кейса после решения.
+// Decision - the decision of a turn being applied. Status is the case status after the decision.
 type Decision struct {
 	Source      string // llm | rule
 	Status      qualify.Status
@@ -80,34 +80,34 @@ type Decision struct {
 	RawResponse map[string]any
 }
 
-// Reply - сообщение лиду в плане решения.
+// Reply - a message to the lead in the decision plan.
 type Reply struct {
 	Purpose string
 	Text    string
 }
 
-// Task - задача менеджеру в CRM; пустой ManagerID - ответственному сделки.
+// Task - a task for the manager in the CRM; an empty ManagerID means the deal owner.
 type Task struct {
 	ManagerID string
 	Text      string
 }
 
-// Plan - эффекты решения, которые пишутся в его транзакции.
+// Plan - the decision effects written in its transaction.
 type Plan struct {
 	Reply   *Reply
 	CRMNote string
 	CRMTask *Task
-	// Slots - новый набор окон, показанных лиду; SlotsTTL - до когда он живой.
+	// Slots - the new set of windows shown to the lead; SlotsTTL - until when it is alive.
 	Slots    []qualify.OfferedSlot
 	SlotsTTL time.Time
-	// DropSlots - набор больше не действует (бронь, отказ).
+	// DropSlots - the set is no longer valid (booking, refusal).
 	DropSlots bool
-	// Booking - новая бронь. Уникальность (менеджер, начало) держит индекс.
+	// Booking - a new booking. Uniqueness of (manager, start) is held by an index.
 	Booking *qualify.Meeting
-	// CancelMeeting - снять активную бронь кейса.
+	// CancelMeeting - cancel the case's active booking.
 	CancelMeeting bool
-	// CancelOutbox - погасить недоставленные сообщения лиду до ответа этого
-	// решения: после прощания не уходит ничего, что стояло в очереди.
+	// CancelOutbox - cancel undelivered messages to the lead before the reply of this
+	// decision: after a farewell nothing that was queued goes out.
 	CancelOutbox bool
 }
 

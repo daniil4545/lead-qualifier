@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// OutboxItem - строка доставки с адресами лида: куда писать и какую сделку
-// трогать в CRM.
+// OutboxItem - a delivery row with the lead's addresses: where to write and which deal
+// to touch in the CRM.
 type OutboxItem struct {
 	ID        int64
 	CaseID    int64
@@ -24,12 +24,12 @@ type OutboxItem struct {
 	Attempts  int
 }
 
-// outboxMaxFailures - после стольких неудачных отправок строка считается
-// недоставленной и остаётся в аудите со статусом failed.
+// outboxMaxFailures - after this many failed sends the row is considered
+// undelivered and stays in the audit with the status failed.
 const outboxMaxFailures = 3
 
-// ClaimOutbox арендует следующую строку доставки. Аренда истекает сама: строка,
-// брошенная упавшим процессом, вернётся в выборку.
+// ClaimOutbox leases the next delivery row. The lease expires on its own: a row
+// abandoned by a crashed process returns to the selection.
 func (s *Store) ClaimOutbox(ctx context.Context, lease time.Duration) (OutboxItem, bool, error) {
 	var item OutboxItem
 	err := s.pool.QueryRow(ctx, `
@@ -55,8 +55,8 @@ func (s *Store) ClaimOutbox(ctx context.Context, lease time.Duration) (OutboxIte
 	return item, true, nil
 }
 
-// CompleteOutbox фиксирует доставку. Сообщение лиду попадает в историю кейса
-// той же транзакцией: модель видит только то, что лид реально получил.
+// CompleteOutbox records delivery. The message to the lead enters the case history
+// in the same transaction: the model sees only what the lead actually received.
 func (s *Store) CompleteOutbox(ctx context.Context, item OutboxItem, externalID string) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -89,8 +89,8 @@ func (s *Store) CompleteOutbox(ctx context.Context, item OutboxItem, externalID 
 	return nil
 }
 
-// RetryOutbox откладывает строку после сбоя доставки; после outboxMaxFailures
-// строка уходит в failed.
+// RetryOutbox defers a row after a delivery failure; after outboxMaxFailures
+// the row goes to failed.
 func (s *Store) RetryOutbox(ctx context.Context, item OutboxItem, cause error) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -124,7 +124,7 @@ func (s *Store) RetryOutbox(ctx context.Context, item OutboxItem, cause error) e
 	return nil
 }
 
-// lockClaim проверяет, что строка всё ещё принадлежит этой аренде.
+// lockClaim checks that the row still belongs to this lease.
 func lockClaim(ctx context.Context, tx pgx.Tx, item OutboxItem) error {
 	var status string
 	var attempts int

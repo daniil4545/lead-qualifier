@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-// chatResponse - ответ chat completions в форме OpenRouter с одним текстом.
+// chatResponse - a chat completions answer in the OpenRouter shape with a single text.
 func chatResponse(content string) string {
 	body, _ := json.Marshal(map[string]any{
 		"id": "gen-test", "object": "chat.completion", "model": "example/chat-model",
@@ -23,8 +23,8 @@ func chatResponse(content string) string {
 	return string(body)
 }
 
-// mockOpenRouter: healthy - модель отвечает текстом, критик одобряет;
-// иначе каждый вызов получает 503.
+// mockOpenRouter: healthy means the model answers with text and the critic approves;
+// otherwise every call gets 503.
 func mockOpenRouter(t *testing.T, healthy bool) *httptest.Server {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -47,9 +47,9 @@ func mockOpenRouter(t *testing.T, healthy bool) *httptest.Server {
 	return server
 }
 
-// Критерий «без технических сбоев»: отчёт считает прогоны transport_error,
-// и любой такой прогон делает исход prompteval ненулевым.
-// Не параллельный: адрес модели приходит через окружение.
+// The "no technical failures" criterion: the report counts transport_error runs,
+// and any such run makes the prompteval exit code non-zero.
+// Not parallel: the model address comes through the environment.
 func TestRun_CountsTransportErrors(t *testing.T) {
 	for _, tc := range []struct {
 		name    string

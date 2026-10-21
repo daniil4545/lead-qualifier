@@ -10,8 +10,8 @@ import (
 	"unicode/utf8"
 )
 
-// Facts - снимок фактов кейса. Ключи пяти фактов лида фиксированы кодом, плюс
-// три служебных ключа вердикта ниши (niche, niche_off, niche_of).
+// Facts - the snapshot of case facts. The keys of the five lead facts are fixed by the code, plus
+// three service keys of the niche verdict (niche, niche_off, niche_of).
 type Facts map[string]any
 
 const (
@@ -26,17 +26,17 @@ const (
 	factNicheOf  = "niche_of"
 )
 
-// RequiredFacts - что обязано быть собрано до гейта записи.
+// RequiredFacts - what must be collected before the booking gate.
 var RequiredFacts = []string{FactService, FactRevenue, FactRole, FactIsOwner, FactCity}
 
-// maxFactChars - потолок длины значения: факт уходит в доверенный контекст
-// модели, и длинный текст там был бы произвольным payload.
+// maxFactChars - the ceiling of a value's length: a fact goes into the trusted context of
+// the model, and long text there would be an arbitrary payload.
 const maxFactChars = 256
 
-// roleOwner - роль, выведенная из подтверждённого владения.
+// roleOwner - the role derived from confirmed ownership.
 const roleOwner = "собственник"
 
-// FactDelta - недоверенная дельта фактов из save_facts. nil - поле не трогать.
+// FactDelta - an untrusted facts delta from save_facts. nil means leave the field alone.
 type FactDelta struct {
 	Service *string `json:"service"`
 	Revenue *string `json:"monthly_revenue"`
@@ -45,7 +45,7 @@ type FactDelta struct {
 	City    *string `json:"city"`
 }
 
-// Names - имена полей дельты без значений: для лога.
+// Names - the delta field names without values: for the log.
 func (d FactDelta) Names() []string {
 	names := []string{}
 	set := []bool{d.Service != nil, d.Revenue != nil, d.Role != nil, d.IsOwner != nil, d.City != nil}
@@ -57,13 +57,13 @@ func (d FactDelta) Names() []string {
 	return names
 }
 
-// Value - строковое значение факта; пусто, если факта нет или он не строка.
+// Value - the string value of a fact; empty if there is no fact or it is not a string.
 func (f Facts) Value(key string) string {
 	value, _ := f[key].(string)
 	return strings.TrimSpace(value)
 }
 
-// Known копирует только непустые факты.
+// Known copies only non-empty facts.
 func (f Facts) Known() Facts {
 	known := make(Facts, len(f))
 	for name, value := range f {
@@ -74,7 +74,7 @@ func (f Facts) Known() Facts {
 	return known
 }
 
-// Missing - обязательные факты, которых нет в снимке.
+// Missing - the required facts absent from the snapshot.
 func (f Facts) Missing() []string {
 	var missing []string
 	for _, name := range RequiredFacts {
@@ -96,9 +96,9 @@ func isEmptyFact(value any) bool {
 	}
 }
 
-// DeriveOwnerRole: подтверждённый собственник без названной роли получает роль
-// «собственник». Обратного вывода нет: роль «директор» не делает лида
-// собственником, это решает только его прямой ответ.
+// DeriveOwnerRole: a confirmed owner without a named role gets the role
+// "owner". There is no reverse inference: the role "director" does not make the lead
+// an owner, only their direct answer does.
 func DeriveOwnerRole(facts Facts) {
 	owner, ok := facts[FactIsOwner].(bool)
 	if !ok || !owner {
@@ -110,8 +110,8 @@ func DeriveOwnerRole(facts Facts) {
 	facts[FactRole] = roleOwner
 }
 
-// Merge накладывает дельту на доверенный снимок и возвращает новый снимок.
-// Поправка лида побеждает прежнее значение: гейт после неё пересчитывается.
+// Merge applies the delta to the trusted snapshot and returns a new snapshot.
+// The lead's correction beats the previous value: the gate is recomputed after it.
 func Merge(trusted Facts, delta FactDelta) Facts {
 	merged := trusted.Known()
 	mergeString(merged, FactService, delta.Service)
@@ -134,8 +134,8 @@ func mergeString(merged Facts, name string, value *string) {
 	}
 }
 
-// mergeRole: «собственник» поверх подтверждённого владения ничего не уточняет
-// и затёр бы настоящую должность лида.
+// mergeRole: "owner" on top of confirmed ownership clarifies nothing
+// and would erase the lead's real job title.
 func mergeRole(merged Facts, value *string, ownerDelta *bool) {
 	if value == nil {
 		return
@@ -152,8 +152,8 @@ func mergeRole(merged Facts, value *string, ownerDelta *bool) {
 	merged[FactRole] = clean
 }
 
-// Differ - ход изменил факты лида. Вердикт ниши из сравнения исключён: его
-// пишет код, а не лид.
+// Differ - the turn changed the lead's facts. The niche verdict is excluded from the comparison: it
+// is written by the code, not by the lead.
 func Differ(base, merged Facts) bool {
 	baseline := dialogFacts(base)
 	DeriveOwnerRole(baseline)
@@ -168,7 +168,7 @@ func dialogFacts(source Facts) Facts {
 	return facts
 }
 
-// Validate проверяет значения до применения снимка: длину и формат выручки.
+// Validate checks the values before the snapshot is applied: length and revenue format.
 func Validate(facts Facts) error {
 	for name, value := range facts {
 		if text, ok := value.(string); ok && utf8.RuneCountInString(text) > maxFactChars {
@@ -194,7 +194,7 @@ func Validate(facts Facts) error {
 	return nil
 }
 
-// revenueBounds - нижняя и верхняя граница названной выручки.
+// revenueBounds - the lower and upper bound of the named revenue.
 func revenueBounds(facts Facts) (lower, upper int64, ok bool) {
 	revenue := facts.Value(FactRevenue)
 	if revenue == "" {
@@ -224,8 +224,8 @@ func parseAmount(value string) (int64, error) {
 	return strconv.ParseInt(value, 10, 64)
 }
 
-// Sanitize приводит значение факта к безопасной строке: факты - данные, а не
-// инструкции. Невидимые символы удаляются, переносы схлопываются в пробел.
+// Sanitize brings a fact value to a safe string: facts are data, not
+// instructions. Invisible characters are removed, line breaks collapse into a space.
 func Sanitize(value string) string {
 	var builder strings.Builder
 	builder.Grow(len(value))
@@ -242,7 +242,7 @@ func Sanitize(value string) string {
 	return strings.TrimSpace(builder.String())
 }
 
-// NormalizeText - нижний регистр и одиночные пробелы: форма для сравнения.
+// NormalizeText - lower case and single spaces: the form for comparison.
 func NormalizeText(value string) string {
 	return strings.ToLower(strings.Join(strings.Fields(value), " "))
 }

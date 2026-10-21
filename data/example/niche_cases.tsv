@@ -1,7 +1,7 @@
-# Описания бизнеса лида и ожидаемый исход при выручке выше всех порогов.
-# Колонки через табуляцию: описание услуги, исход гейта (offer | off_profile),
-# код сегмента для offer (пусто у off_profile), пояснение.
-# Мерило живого теста классификатора ниши.
+# Descriptions of the lead's business and the expected outcome at revenue above all thresholds.
+# Tab-separated columns: service description, gate outcome (offer | off_profile),
+# segment code for offer (empty for off_profile), explanation.
+# The yardstick of the live niche classifier test.
 сеть магазинов одежды в трёх торговых центрах	offer	retail	розница
 интернет-магазин детских игрушек со складом	offer	retail	розница онлайн
 сеть магазинов бытовой химии	offer	retail	розница

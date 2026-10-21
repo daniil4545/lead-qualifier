@@ -10,25 +10,25 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/knowledge"
 )
 
-// Guard - детерминированные фильтры свободного текста модели. Готовые тексты
-// кода через него не идут. Лишнее срабатывание стоит перегенерации, пропуск -
-// утечки, поэтому фильтры строже, чем нужно.
+// Guard - deterministic filters for free model text. The ready texts
+// of the code do not pass through it. A false positive costs a regeneration, a miss is
+// a leak, so the filters are stricter than necessary.
 type Guard struct {
 	stopPatterns  []*regexp.Regexp
 	linkWhitelist map[string]bool
 	isPrice       func(int64) bool
 }
 
-// Violation - одно нарушение. Quote идёт только в аудит решения, не в лог.
+// Violation - one violation. Quote goes only into the decision audit, not the log.
 type Violation struct {
 	Category string // price | name | contact | link | length | internal_rule | service_echo
 	Quote    string
 }
 
-// maxOutboundChars - потолок длины ответа лиду.
+// maxOutboundChars - the length ceiling of a reply to the lead.
 const maxOutboundChars = 4000
 
-// NewGuard собирает фильтры из стоп-словаря, ссылок каталога и цен тарифов.
+// NewGuard builds the filters from the stop dictionary, catalog links and tariff prices.
 func NewGuard(stopNames []string, linkWhitelist map[string]bool, isPrice func(int64) bool) Guard {
 	return Guard{
 		stopPatterns:  buildStopPatterns(stopNames),
@@ -38,29 +38,29 @@ func NewGuard(stopNames []string, linkWhitelist map[string]bool, isPrice func(in
 }
 
 var (
-	// Группа цифр и необязательная единица: голая сумма в ценовом контексте
-	// ловится так же, как сумма с «₽».
+	// A group of digits with an optional unit: a bare amount in a price context
+	// is caught the same way as an amount with "₽".
 	moneyPattern = regexp.MustCompile(`(?i)(\d[\d\s\x{00A0}]*)\s*(млн|миллион\p{L}*|тысяч\p{L}*|тыс\.?|т\.\s*р\.?|рубл\p{L}*|руб\.?|₽|rub\p{L}*|к|k|р\.)?`)
-	// Сумма прописью: канон бот называет цифрами, прописная сумма в ценовом
-	// контексте - мимо канона.
+	// An amount in words: the bot states catalog prices in digits, so a spelled-out amount in a
+	// price context is off-canon.
 	spelledMoneyPattern = regexp.MustCompile(`(?i)\p{L}+\s+(тысяч\p{L}*|миллион\p{L}*)`)
 	phonePattern        = regexp.MustCompile(`\+?\d[\d\s().\-]{7,}\d`)
 	emailPattern        = regexp.MustCompile(`\S+@\S+\.\S+`)
 )
 
-// priceContextKeys рядом с суммой значат, что бот называет цену.
+// priceContextKeys next to an amount mean the bot is naming a price.
 var priceContextKeys = []string{"цен", "стоит", "стоимост", "оплат", "тариф", "рассрочк", "прайс"}
 
-// revenueContextKeys рядом с суммой значат пересказ выручки лида, а не цену.
+// revenueContextKeys next to an amount mean a retelling of the lead's revenue, not a price.
 var revenueContextKeys = []string{"выручк", "оборот", "зарабат", "доход"}
 
-// Граница слова для кириллицы: \b в RE2 работает только по ASCII.
+// Word boundary for Cyrillic: \b in RE2 works only for ASCII.
 const (
 	boundaryLeft  = `(?:^|[^\p{L}\p{N}_])`
 	boundaryRight = `(?:[^\p{L}\p{N}_]|$)`
 )
 
-// Падежные окончания фамилий поверх основы, кириллица и транслит.
+// Case endings of surnames on top of the stem, Cyrillic and transliteration.
 const (
 	declensionSuffixes      = `(?:ому|ами|ых|ом|ым|ой|ах|а|у|е|ю|ы)?`
 	latinDeclensionSuffixes = `(?:omu|ami|akh|ykh|om|ym|oy|yu|ya|a|u|e|y)?`
@@ -74,8 +74,8 @@ var translitTable = map[rune]string{
 	'ъ': "", 'ы': "y", 'ь': "", 'э': "e", 'ю': "yu", 'я': "ya",
 }
 
-// buildStopPatterns: одиночное кириллическое слово - фамилия, ловится с
-// падежами и в транслите; остальное - фраза целиком.
+// buildStopPatterns: a single Cyrillic word is a surname, caught with
+// its cases and in transliteration; anything else is a whole phrase.
 func buildStopPatterns(names []string) []*regexp.Regexp {
 	var patterns []*regexp.Regexp
 	for _, name := range names {
@@ -98,10 +98,10 @@ func buildStopPatterns(names []string) []*regexp.Regexp {
 	return patterns
 }
 
-// Check проверяет черновик и возвращает все нарушения. tariffPrice - цена
-// тарифа лида, посчитанная кодом; 0 - тариф неизвестен, и любая сумма в
-// ценовом контексте запрещена. leadName - имя лида: совпавшая с ним стоп-фамилия
-// нарушением не считается, бот вправе обратиться к лиду.
+// Check checks a draft and returns all violations. tariffPrice is the price
+// of the lead's tariff computed by the code; 0 means the tariff is unknown and any amount in a
+// price context is forbidden. leadName is the lead's name: a stop surname matching it
+// is not a violation, the bot may address the lead.
 func (g Guard) Check(text string, tariffPrice int64, leadName string) []Violation {
 	if strings.TrimSpace(text) == "" {
 		return []Violation{{Category: "length"}}
@@ -135,9 +135,9 @@ func nameMatchesLead(quote, leadName string) bool {
 	return false
 }
 
-// priceViolations: в ценовом контексте легитимна только цена тарифа лида.
-// Пересказ выручки лида не флагается, кроме цены каталога рядом с ценовым
-// словом - это названная цена, а слово «выручка» рядом её не прячет.
+// priceViolations: in a price context only the price of the lead's tariff is legitimate.
+// A retelling of the lead's revenue is not flagged, except a catalog price next to a price
+// word: that is a named price, and the word "revenue" nearby does not hide it.
 func (g Guard) priceViolations(text string, tariffPrice int64) []Violation {
 	var violations []Violation
 	for _, loc := range moneyPattern.FindAllStringSubmatchIndex(text, -1) {
@@ -159,7 +159,7 @@ func (g Guard) priceViolations(text string, tariffPrice int64) []Violation {
 			continue
 		}
 		if strings.TrimSpace(unit) == "" {
-			// Голая сумма - только в ценовом контексте и не похожая на год.
+			// A bare amount counts only in a price context and when it does not look like a year.
 			if !priceContext || len(digits) < 4 || (value >= 1900 && value <= 2100) {
 				continue
 			}
@@ -181,8 +181,8 @@ func (g Guard) priceViolations(text string, tariffPrice int64) []Violation {
 	return violations
 }
 
-// internalRulePatterns - внутренняя кухня, которую лид слышать не должен:
-// порог приёма по выручке и служебная механика. Ловится связка, а не слово.
+// internalRulePatterns - the inner kitchen the lead must not hear:
+// the revenue acceptance threshold and service mechanics. A combination is caught, not a single word.
 var internalRulePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)(бер[её]м|работаем|принимаем|подходят|берут)\p{L}*[^.!?]{0,60}(выручк|оборот)\p{L}*[^.!?]{0,20}от\s*\d`),
 	regexp.MustCompile(`(?i)порог\p{L}*[^.!?]{0,40}(выручк|оборот)|(выручк|оборот)\p{L}*[^.!?]{0,40}порог`),
@@ -201,8 +201,8 @@ func internalRuleViolations(text string) []Violation {
 	return violations
 }
 
-// serviceEchoPatterns - модель отвечает служебному замечанию, а не лиду.
-// Замечание лежит в истории ролью user, и модель принимает его за реплику.
+// serviceEchoPatterns - the model answers a service remark instead of the lead.
+// The remark sits in history with the user role, and the model takes it for a lead message.
 var serviceEchoPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)не\s+по\s+адресу`),
 	regexp.MustCompile(`(?i)адресован\p{L}*\s+не\s+мне|не\s+мне\s+адресован\p{L}*`),
@@ -210,8 +210,8 @@ var serviceEchoPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)редактор\p{L}*[^.!?]{0,40}(отклон|замечани|перепис|перепиш)|(отклон|замечани|перепис|перепиш)\p{L}*[^.!?]{0,40}редактор`),
 }
 
-// serviceEchoViolations проверяется только на перегенерированном черновике: в
-// первом служебного замечания в истории ещё нет.
+// serviceEchoViolations is checked only on a regenerated draft: the
+// first one has no service remark in history yet.
 func serviceEchoViolations(text string) []Violation {
 	for _, pattern := range serviceEchoPatterns {
 		if quote := pattern.FindString(text); quote != "" {
@@ -221,8 +221,8 @@ func serviceEchoViolations(text string) []Violation {
 	return nil
 }
 
-// contactViolations ловит телефоны и почту. Сумма телефоном не считается:
-// нужен телефонный признак и нет денежной единицы следом.
+// contactViolations catches phones and e-mail. An amount does not count as a phone:
+// it needs a phone sign and no currency unit after it.
 func contactViolations(text string) []Violation {
 	var violations []Violation
 	for _, loc := range phonePattern.FindAllStringIndex(text, -1) {
@@ -250,13 +250,13 @@ func (g Guard) linkViolations(text string) []Violation {
 	return violations
 }
 
-// Множители денежных единиц «тыс» и «млн».
+// Multipliers of the currency units "thousand" and "million".
 const (
 	unitThousand = 1_000
 	unitMillion  = 1_000_000
 )
 
-// scaleAmount переводит сумму с единицей в полные рубли.
+// scaleAmount converts an amount with a unit into whole rubles.
 func scaleAmount(digits, unit string) (int64, bool) {
 	base, err := strconv.ParseInt(digits, 10, 64)
 	if err != nil {
@@ -289,8 +289,8 @@ func followedByMoneyUnit(text string, from int) bool {
 	return false
 }
 
-// phoneLike: 10-15 цифр и телефонный признак - ведущий +, 7 или 8, скобки
-// или дефис. Пересказ суммы («10 000 000») его не имеет.
+// phoneLike: 10-15 digits and a phone sign - a leading +, 7 or 8, parentheses
+// or a hyphen. A retold amount ("10 000 000") has none of these.
 func phoneLike(quote string) bool {
 	digits := digitsOnly(quote)
 	if len(digits) < 10 || len(digits) > 15 {
@@ -301,7 +301,7 @@ func phoneLike(quote string) bool {
 	return hasSeparator || leading
 }
 
-// contextWindow - участок текста вокруг совпадения, подрезанный по рунам.
+// contextWindow - the text around a match, trimmed by runes.
 func contextWindow(text string, start, end, radius int) string {
 	low := max(start-radius, 0)
 	for low > 0 && !utf8.RuneStart(text[low]) {
@@ -335,8 +335,8 @@ func isSingleCyrillicWord(entry string) bool {
 	return true
 }
 
-// surnameStem: у женских на -а/-я и прилагательных на -ий/-ый окончание
-// отбрасывается, чтобы падежи ловились от основы.
+// surnameStem: for feminine surnames in -a/-ya and adjectives in -iy/-yy the ending
+// is dropped so that cases are caught from the stem.
 func surnameStem(word string) string {
 	runes := []rune(word)
 	n := len(runes)

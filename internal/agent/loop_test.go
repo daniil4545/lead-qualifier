@@ -19,9 +19,9 @@ import (
 
 const catalogDir = "../../data/example"
 
-// fakeOpenRouter отвечает записанными ответами: ходу агента - по сценарию,
-// дальше ответом fallback (по умолчанию текстом); критику - «ок»;
-// классификатору ниши - retail.
+// fakeOpenRouter answers with recorded responses: the agent turn by a script,
+// then the fallback answer (text by default); the critic with "ok";
+// the niche classifier with retail.
 type fakeOpenRouter struct {
 	mu       sync.Mutex
 	script   []string
@@ -92,8 +92,8 @@ func loadFixture(t *testing.T) fixture {
 	return fixture{catalog: catalog, rules: qualify.NewRules(catalog)}
 }
 
-// client собирает агента каталога data/example поверх фейкового OpenRouter
-// со сценарием ответов модели.
+// client builds the agent of the data/example catalog on top of a fake OpenRouter
+// with a script of model answers.
 func (fx fixture) client(t *testing.T, script ...string) *Client {
 	t.Helper()
 	return fx.clientWith(t, &fakeOpenRouter{script: script})
@@ -120,7 +120,7 @@ func (fx fixture) clientWith(t *testing.T, fake *fakeOpenRouter) *Client {
 func strPtr(value string) *string { return &value }
 func boolPtr(value bool) *bool    { return &value }
 
-// fullFacts - полный набор фактов; direction пусто - вердикта ниши нет.
+// fullFacts - a full set of facts; an empty direction means no niche verdict.
 func (fx fixture) fullFacts(revenue, direction string) qualify.Facts {
 	facts := qualify.Merge(qualify.Facts{}, qualify.FactDelta{
 		Service: strPtr("сеть магазинов бытовой техники"),
@@ -136,7 +136,7 @@ func (fx fixture) fullFacts(revenue, direction string) qualify.Facts {
 }
 
 func turnInput(status qualify.Status, facts qualify.Facts, leadText string) qualify.DecisionInput {
-	now := time.Date(2026, time.October, 5, 3, 0, 0, 0, time.UTC) // понедельник, 10:00 в Новосибирске
+	now := time.Date(2026, time.October, 5, 3, 0, 0, 0, time.UTC) // Monday, 10:00 in Novosibirsk
 	return qualify.DecisionInput{
 		Case: qualify.Case{ID: 1, LeadID: 1, Status: status, Facts: facts, CreatedAt: now, UpdatedAt: now},
 		Lead: qualify.Lead{ID: 1, Name: "Олег", PeerRef: "peer-1", CRMRef: "1"},
@@ -149,14 +149,14 @@ func turnInput(status qualify.Status, facts qualify.Facts, leadText string) qual
 	}
 }
 
-// Рубеж записи: окна и бронь только после вердикта ниши, при полном наборе
-// фактов, открытом гейте и без назначенной встречи. Последняя строка -
-// контроль: в открытом состоянии тот же вызов проходит.
+// The booking boundary: windows and booking only after the niche verdict, with a full set of
+// facts, an open gate and no appointed meeting. The last row is
+// a control: in the open state the same call passes.
 func TestRunTurn_MeetingToolsBlocked(t *testing.T) {
 	t.Parallel()
 	fx := loadFixture(t)
 	serviceOnly := qualify.Merge(qualify.Facts{}, qualify.FactDelta{Service: strPtr("сеть магазинов")})
-	// Ниша известна, выручка выше порога, но нет роли, владения и города.
+	// The niche is known, revenue is above the threshold, but there is no role, ownership or city.
 	nicheOnly := qualify.Merge(qualify.Facts{}, qualify.FactDelta{Service: strPtr("сеть магазинов"), Revenue: strPtr("3000000")})
 	fx.rules.ApplyVerdict(nicheOnly, qualify.NicheVerdict{Direction: "retail"})
 	meeting := &qualify.Meeting{ID: 1, CaseID: 1, ManagerID: "pavel", Status: qualify.MeetingScheduled,
@@ -203,8 +203,8 @@ func TestRunTurn_MeetingToolsBlocked(t *testing.T) {
 	}
 }
 
-// Два битых save_facts за ход - сбой модели invalid_facts; один битый
-// и затем верный - обычный ход с сохранённым фактом.
+// Two broken save_facts per turn are a model failure invalid_facts; one broken
+// and then a valid one is an ordinary turn with the fact saved.
 func TestRunTurn_InvalidFacts(t *testing.T) {
 	t.Parallel()
 	fx := loadFixture(t)

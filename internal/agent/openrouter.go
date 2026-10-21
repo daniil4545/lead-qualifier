@@ -1,6 +1,6 @@
-// Package agent - ход модели: цикл с native tool calling через OpenRouter,
-// guard и критик над текстом. Побочных эффектов нет: RunTurn возвращает
-// недоверенный Turn, применяет его детерминированный код в dialog.
+// Package agent - a model turn: a loop with native tool calling through OpenRouter,
+// guard and critic over the text. No side effects: RunTurn returns
+// an untrusted Turn, and deterministic code in dialog applies it.
 package agent
 
 import (
@@ -21,7 +21,7 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/qualify"
 )
 
-// ExternalFailure - сбой вызова модели. Permanent - повтор не поможет.
+// ExternalFailure - a failed model call. Permanent means a retry will not help.
 type ExternalFailure struct {
 	Kind      string
 	Message   string
@@ -36,7 +36,7 @@ func (f *ExternalFailure) Error() string {
 	return f.Kind + ": " + f.Message
 }
 
-// Client - ход агента поверх OpenRouter для одного каталога.
+// Client - the agent turn on top of OpenRouter for one catalog.
 type Client struct {
 	cfg       config.OpenRouter
 	http      *http.Client
@@ -47,8 +47,8 @@ type Client struct {
 	location  *time.Location
 }
 
-// New собирает клиента. httpClient nil - клиент по умолчанию; таймаут
-// каждого вызова задаётся контекстом из cfg.Timeout.
+// New builds the client. A nil httpClient means the default client; the timeout
+// of each call is set by the context from cfg.Timeout.
 func New(cfg config.OpenRouter, catalog config.Catalog, prompts Prompts, kb knowledge.Set,
 	guard Guard, rules qualify.Rules, httpClient *http.Client) *Client {
 	if httpClient == nil {
@@ -66,8 +66,8 @@ type message struct {
 	ToolCalls  []toolCall `json:"tool_calls,omitempty"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
 	Name       string     `json:"name,omitempty"`
-	// ReasoningDetails переотправляется как есть: без него часть провайдеров
-	// отбивает tool-цикл ошибкой 400.
+	// ReasoningDetails is resent as is: without it some providers
+	// reject the tool loop with a 400 error.
 	ReasoningDetails json.RawMessage `json:"reasoning_details,omitempty"`
 }
 
@@ -135,8 +135,8 @@ type response struct {
 	} `json:"usage"`
 }
 
-// newRequest - общая часть запроса: провайдер не хранит данные, параметры
-// обязательны к поддержке, иначе strict-схема молча не применится.
+// newRequest - the common part of a request: the provider does not store data, and the parameters
+// are required to be supported, otherwise the strict schema is silently not applied.
 func (c *Client) newRequest(model string, messages []message, sessionID string) request {
 	zero := 0.0
 	return request{
@@ -147,8 +147,8 @@ func (c *Client) newRequest(model string, messages []message, sessionID string) 
 	}
 }
 
-// call выполняет один HTTP-вызов и декодирует ответ. Повторов внутри нет:
-// переигрыванием хода управляет dialog.
+// call performs one HTTP call and decodes the answer. There are no retries inside:
+// replaying the turn is managed by dialog.
 func (c *Client) call(ctx context.Context, payload request) (response, error) {
 	if c.cfg.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -182,8 +182,8 @@ func (c *Client) call(ctx context.Context, payload request) (response, error) {
 		}
 	}()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		// Тело ошибки идёт в аудит решения, но не в лог: провайдер может
-		// процитировать промпт.
+		// The error body goes into the decision audit, but not the log: the provider may
+		// quote the prompt.
 		return response{}, &ExternalFailure{
 			Kind:      "openrouter_http",
 			Message:   fmt.Sprintf("OpenRouter HTTP %d: %s", resp.StatusCode, bodySnippet(resp.Body)),
@@ -205,10 +205,10 @@ func (c *Client) call(ctx context.Context, payload request) (response, error) {
 	return decoded, nil
 }
 
-// retryableStatus: 402 временный - деньги появятся после пополнения; 404 у
-// OpenRouter значит «нет провайдера сейчас», а не отсутствие ресурса. 400
-// тоже переигрывается: история хода собирается заново, и отвергнутый ответ в
-// неё уже не попадёт.
+// retryableStatus: 402 is temporary, money appears after a top-up; 404 from
+// OpenRouter means "no provider right now", not a missing resource. 400
+// is replayed too: the turn history is rebuilt, and the rejected answer will not
+// get into it again.
 func retryableStatus(status int) bool {
 	switch status {
 	case http.StatusBadRequest, http.StatusNotFound, http.StatusRequestTimeout, http.StatusPaymentRequired,
@@ -227,7 +227,7 @@ func bodySnippet(body io.Reader) string {
 	return strings.Join(strings.Fields(string(raw)), " ")
 }
 
-// sessionID одинаков для всех вызовов кейса: провайдер держит один маршрут.
+// sessionID is the same for all calls of a case: the provider keeps one route.
 func sessionID(caseID int64) string {
 	return "case:" + strconv.FormatInt(caseID, 10)
 }

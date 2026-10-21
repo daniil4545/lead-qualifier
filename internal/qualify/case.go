@@ -1,6 +1,6 @@
-// Package qualify - доменная модель квалификации: кейс и его статусы, факты
-// лида, тарифы, ниша и гейт записи на встречу. Решения здесь детерминированные:
-// модель только приносит факты, судит этот код.
+// Package qualify - the domain model of qualification: the case and its statuses, the lead's
+// facts, tariffs, niche and the meeting booking gate. Decisions here are deterministic:
+// the model only brings facts, this code judges.
 package qualify
 
 import (
@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Status - состояние кейса.
+// Status - the state of a case.
 type Status string
 
 const (
@@ -19,22 +19,22 @@ const (
 	StatusRejected         Status = "rejected"
 	StatusStopped          Status = "stopped"
 	StatusManualReview     Status = "manual_review"
-	// StatusRefused - лид отказался сам. Бот первым не пишет, но входящее лида
-	// возвращает кейс в сбор с сохранёнными фактами.
+	// StatusRefused - the lead refused on their own. The bot does not write first, but the lead's incoming message
+	// returns the case to collection with the facts kept.
 	StatusRefused Status = "refused"
 )
 
-// Frozen - кейс закрыт: входящее сохраняется, но хода не будит.
+// Frozen - the case is closed: an incoming message is saved but does not wake a turn.
 func (s Status) Frozen() bool {
 	return s == StatusRejected || s == StatusStopped || s == StatusManualReview
 }
 
-// Live - кейс в разговоре: входящее ставит его в очередь хода.
+// Live - the case is in conversation: an incoming message queues it for a turn.
 func (s Status) Live() bool {
 	return s == StatusCollecting || s == StatusReadyToDecide || s == StatusMeetingScheduled
 }
 
-// Lead - собеседник. PeerRef - адрес в транспорте, CRMRef - карточка заявки.
+// Lead - the interlocutor. PeerRef is the address in the transport, CRMRef is the lead card.
 type Lead struct {
 	ID      int64
 	Name    string
@@ -42,7 +42,7 @@ type Lead struct {
 	CRMRef  string
 }
 
-// Case - проекция кейса. Факты - доверенный снимок после проверки Go.
+// Case - the case projection. Facts are a trusted snapshot after Go validation.
 type Case struct {
 	ID             int64
 	LeadID         int64
@@ -59,7 +59,7 @@ const (
 	DirectionOut = "out"
 )
 
-// Message - реплика в истории кейса.
+// Message - a message in the case history.
 type Message struct {
 	ID        int64
 	CaseID    int64
@@ -68,16 +68,16 @@ type Message struct {
 	CreatedAt time.Time
 }
 
-// OfferedSlot - окно, показанное лиду. ManagerID - чей набор показан, но не
-// обещание: при брони названный час берёт свободный менеджер с меньшим
-// Priority, лид выбирает время, а не человека.
+// OfferedSlot - a window shown to the lead. ManagerID is whose set was shown, but not
+// a promise: on booking the named hour is taken by a free manager with the lower
+// Priority, the lead chooses a time, not a person.
 type OfferedSlot struct {
 	ManagerID string
 	Start     time.Time
 	End       time.Time
 }
 
-// Meeting - бронь встречи. Status: scheduled либо cancelled.
+// Meeting - the meeting booking. Status: scheduled or cancelled.
 type Meeting struct {
 	ID        int64
 	CaseID    int64
@@ -92,23 +92,23 @@ const (
 	MeetingCancelled = "cancelled"
 )
 
-// DecisionInput - снимок кейса на момент хода. Now - момент хода, его задаёт
-// вызывающий: тесты и eval передают фиксированное время.
+// DecisionInput - the case snapshot at the moment of a turn. Now is the turn moment, set by
+// the caller: tests and eval pass a fixed time.
 type DecisionInput struct {
 	Case                  Case
 	Lead                  Lead
 	Messages              []Message
 	LastIncomingMessageID int64
 	OfferedSlots          []OfferedSlot
-	// Meeting - активная бронь кейса; nil, если брони нет. ManagerName - имя
-	// менеджера брони из каталога, его заполняет dialog.
+	// Meeting - the active booking of the case; nil if there is none. ManagerName is the name
+	// of the booking manager from the catalog, filled by dialog.
 	Meeting     *Meeting
 	ManagerName string
 	Now         time.Time
 }
 
-// LeadBlock - реплики лида, на которые отвечает ход: все входящие после
-// последнего исходящего.
+// LeadBlock - the lead's messages the turn answers: all incoming ones after the
+// last outgoing one.
 func (in DecisionInput) LeadBlock() string {
 	var block []string
 	for index := len(in.Messages) - 1; index >= 0; index-- {
@@ -122,10 +122,10 @@ func (in DecisionInput) LeadBlock() string {
 	return strings.Join(block, "\n")
 }
 
-// CompleteIsIdempotent - повторный complete не пересчитывает гейт: окна лид
-// уже получил. Поправка факта в ready_to_decide это отменяет - изменившийся
-// факт обязан пройти гейт заново. Назначенную встречу гейт не пересматривает:
-// он не снимает бронь, и лид остался бы с отказом поверх записи.
+// CompleteIsIdempotent - a repeated complete does not recompute the gate: the lead
+// already got the windows. A fact correction in ready_to_decide overrides this: a changed
+// fact must pass the gate again. The gate does not review an appointed meeting:
+// it does not cancel the booking, and the lead would be left with a refusal on top of a booking.
 func CompleteIsIdempotent(status Status, factsChanged bool) bool {
 	return status == StatusMeetingScheduled || (status == StatusReadyToDecide && !factsChanged)
 }

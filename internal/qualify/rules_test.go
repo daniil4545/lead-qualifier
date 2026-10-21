@@ -8,7 +8,7 @@ import (
 	"github.com/daniil4545/lead-qualifier/internal/config"
 )
 
-// testRules - каталог теста: пороги и цены свои, чтобы тест не зависел от data/example.
+// testRules - the test catalog: own thresholds and prices so the test does not depend on data/example.
 func testRules() Rules {
 	return NewRules(config.Catalog{
 		Tariffs: []config.Tariff{
@@ -25,7 +25,7 @@ func testRules() Rules {
 
 func ptr[T any](value T) *T { return &value }
 
-// leadFacts - полный набор фактов с вердиктом ниши.
+// leadFacts - a full set of facts with the niche verdict.
 func leadFacts(rules Rules, revenue string, verdict NicheVerdict) Facts {
 	facts := Merge(Facts{}, FactDelta{
 		Service: ptr("сеть магазинов"),
@@ -88,7 +88,7 @@ func TestTariffFor_LowerBoundInclusive(t *testing.T) {
 	rules := testRules()
 	cases := []struct {
 		revenue string
-		want    string // имя тарифа; пусто - тарифа нет
+		want    string // tariff name; empty means no tariff
 	}{
 		{"999999", ""},
 		{"1000000", "Малый"},
@@ -170,7 +170,7 @@ func TestOwnerRole(t *testing.T) {
 		base      FactDelta
 		delta     FactDelta
 		wantRole  string
-		wantOwner bool // is_owner известен
+		wantOwner bool // is_owner is known
 	}{
 		{"role owner does not set is_owner", FactDelta{}, FactDelta{Role: ptr(roleOwner)}, roleOwner, false},
 		{"role director does not set is_owner", FactDelta{}, FactDelta{Role: ptr("директор")}, "директор", false},

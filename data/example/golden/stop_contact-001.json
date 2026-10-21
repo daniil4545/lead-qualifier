@@ -28,5 +28,5 @@
   "expected_fact_parts": {},
   "expected_tool_args": {},
   "forbidden_response": [],
-  "reason": "Прямая просьба больше не писать: stop_contact, прощание пишет код."
+  "reason": "A direct request not to write anymore: stop_contact, the code writes the farewell."
 }

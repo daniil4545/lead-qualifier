@@ -24,8 +24,8 @@ import (
 
 var databaseSeq atomic.Int64
 
-// openDatabase - интеграционный ярус: своя база на тест в Postgres из
-// DATABASE_URL (Makefile, docker-compose.yml). Под -short тест пропускается.
+// openDatabase - the integration tier: a database per test in Postgres from
+// DATABASE_URL (Makefile, docker-compose.yml). Under -short the test is skipped.
 func openDatabase(t *testing.T) (*store.Store, *pgx.Conn) {
 	t.Helper()
 	if testing.Short() {
@@ -69,8 +69,8 @@ type result struct {
 	err  error
 }
 
-// stubAgent отдаёт заранее заданные ходы своей очередью на каждый кейс
-// и считает вызовы хода по кейсу.
+// stubAgent returns preset turns from its own queue per case
+// and counts turn calls per case.
 type stubAgent struct {
 	mu      sync.Mutex
 	results map[int64][]result
@@ -99,8 +99,8 @@ func (a *stubAgent) ClassifyNiche(context.Context, agent.NicheInput) (qualify.Ni
 	return qualify.NicheVerdict{Direction: "retail"}, nil
 }
 
-// hookCalendar вызывает beforeAvailable перед проверкой часа: так тест
-// вклинивается между подбором окна и транзакцией брони.
+// hookCalendar calls beforeAvailable before the hour check: this way a test
+// wedges in between window selection and the booking transaction.
 type hookCalendar struct {
 	calendar.Calendar
 	beforeAvailable func()
@@ -140,11 +140,11 @@ func (s *recordingSender) since(from int) []sentMessage {
 	return slices.Clone(s.sent[from:])
 }
 
-// now - понедельник 5 октября 2026, 10:00 по Новосибирску (пояс data/example).
+// now - Monday, October 5, 2026, 10:00 in Novosibirsk (the data/example time zone).
 var now = time.Date(2026, time.October, 5, 3, 0, 0, 0, time.UTC)
 
-// Вторник 6 октября по Новосибирску: 12:00 работают оба менеджера каталога,
-// 16:00 - только pavel.
+// Tuesday, October 6 in Novosibirsk: at 12:00 both catalog managers work,
+// at 16:00 only pavel does.
 var (
 	tuesdayNoon = time.Date(2026, time.October, 6, 5, 0, 0, 0, time.UTC)
 	tuesday16   = time.Date(2026, time.October, 6, 9, 0, 0, 0, time.UTC)
@@ -161,7 +161,7 @@ type harness struct {
 	sender   *recordingSender
 	catalog  config.Catalog
 	rules    qualify.Rules
-	cases    map[string]int64 // кейс по адресу лида
+	cases    map[string]int64 // case by lead address
 }
 
 const exampleCatalog = "../../data/example"
@@ -171,7 +171,7 @@ func newHarness(t *testing.T) *harness {
 	return newHarnessFor(t, exampleCatalog)
 }
 
-// newHarnessFor собирает обработчик над каталогом из папки dir.
+// newHarnessFor builds the handler over a catalog from folder dir.
 func newHarnessFor(t *testing.T, dir string) *harness {
 	t.Helper()
 	s, db := openDatabase(t)
@@ -192,7 +192,7 @@ func newHarnessFor(t *testing.T, dir string) *harness {
 	return h
 }
 
-// start заводит заявку в CRM и кейс; приветствие доставлено.
+// start creates a request in the CRM and a case; the greeting is delivered.
 func (h *harness) start(peer string) int64 {
 	h.t.Helper()
 	ctx := context.Background()
@@ -223,7 +223,7 @@ func (h *harness) deliver() {
 	h.t.Fatal("outbox did not drain in 100 deliveries")
 }
 
-// say - реплика лида, ход его кейса с заданным результатом агента и доставка.
+// say - a lead message, the turn of their case with the given agent result, and delivery.
 func (h *harness) say(peer, text string, res result) {
 	h.t.Helper()
 	caseID := h.cases[peer]
@@ -234,7 +234,7 @@ func (h *harness) say(peer, text string, res result) {
 	h.turnOf(caseID)
 }
 
-// turnOf делает ход и требует, чтобы в ход взят был именно этот кейс.
+// turnOf makes a turn and requires that exactly this case was taken for the turn.
 func (h *harness) turnOf(caseID int64) {
 	h.t.Helper()
 	claimed, ok := h.turn()
@@ -243,7 +243,7 @@ func (h *harness) turnOf(caseID int64) {
 	}
 }
 
-// sayToFrozen - реплика лида в закрытый кейс: хода быть не должно.
+// sayToFrozen - a lead message into a closed case: there must be no turn.
 func (h *harness) sayToFrozen(peer, text string) {
 	h.t.Helper()
 	if err := h.worker.Ingest(context.Background(), peer, text, ""); err != nil {
@@ -254,7 +254,7 @@ func (h *harness) sayToFrozen(peer, text string) {
 	}
 }
 
-// turn делает ход по кейсу в очереди, если он есть, и доставляет outbox.
+// turn makes a turn on the case in the queue, if there is one, and delivers the outbox.
 func (h *harness) turn() (int64, bool) {
 	h.t.Helper()
 	ctx := context.Background()
@@ -271,7 +271,7 @@ func (h *harness) turn() (int64, bool) {
 	return c.ID, ok
 }
 
-// elapseBackoff - время отложенного хода прошло: кейс снова можно взять в ход.
+// elapseBackoff - the deferred turn's time has passed: the case can be taken for a turn again.
 func (h *harness) elapseBackoff() {
 	h.t.Helper()
 	if _, err := h.db.Exec(context.Background(), "UPDATE cases SET next_action_at = now()"); err != nil {
@@ -302,7 +302,7 @@ func (h *harness) meetings() []qualify.Meeting {
 	return meetings
 }
 
-// meetingOf - активная бронь кейса; нулевой Start - брони нет.
+// meetingOf - the case's active booking; a zero Start means no booking.
 func (h *harness) meetingOf(caseID int64) qualify.Meeting {
 	h.t.Helper()
 	for _, m := range h.meetings() {
@@ -324,7 +324,7 @@ func (h *harness) facts(revenue string, verdict qualify.NicheVerdict) qualify.Fa
 
 var placeholder = regexp.MustCompile(`\{[a-z]+\}`)
 
-// fragment - самый длинный постоянный кусок текста каталога между подстановками.
+// fragment - the longest constant piece of catalog text between substitutions.
 func fragment(template string) string {
 	longest := ""
 	for _, part := range placeholder.Split(template, -1) {
@@ -349,24 +349,24 @@ func terminal(kind agent.Terminal, reason string) result {
 	return result{turn: agent.Turn{Terminal: kind, Reason: reason}}
 }
 
-// transition - клетка таблицы «состояние против хода».
+// transition - a cell of the "state versus turn" table.
 type transition struct {
 	name       string
 	from       qualify.Status
 	act        func(h *harness) result
 	wantStatus qualify.Status
-	// wantText - текст каталога, который ушёл лиду; nil - не ушло ничего.
+	// wantText - the catalog text that went to the lead; nil means nothing went.
 	wantText func(texts config.Texts) string
-	// wantReason - начало причины решения; пусто - не проверяется.
+	// wantReason - the start of the decision reason; empty means not checked.
 	wantReason string
-	// wantCRM - виды новых записей CRM; crmExact - ровно они, иначе среди прочих.
+	// wantCRM - kinds of new CRM records; crmExact means exactly these, otherwise among others.
 	wantCRM     []string
 	crmExact    bool
 	wantMeeting bool
 }
 
-// Таблица «состояние против хода» среза 1: из какого статуса, каким ходом,
-// в какой статус, что ушло лиду и что появилось в CRM.
+// The "state versus turn" table of slice 1: from which status, by which turn,
+// to which status, what went to the lead and what appeared in the CRM.
 func TestProcessCase_Transitions(t *testing.T) {
 	t.Parallel()
 	failure := &agent.ExternalFailure{Kind: "http", Message: "upstream 503", Status: 503}
@@ -520,8 +520,8 @@ func checkTransition(t *testing.T, h *harness, caseID int64, tc transition, sent
 
 func strPtr(value string) *string { return &value }
 
-// Окно заняли между проверкой часа и транзакцией брони: решение лида
-// откатывается, он получает новые окна, двойной брони нет.
+// The window was taken between the hour check and the booking transaction: the lead's decision
+// rolls back, they get new windows, no double booking.
 func TestProcessCase_SlotTakenDuringTurn(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
@@ -565,8 +565,8 @@ func TestProcessCase_SlotTakenDuringTurn(t *testing.T) {
 	}
 }
 
-// Бронь: в CRM заметка по сделке лида и задача менеджеру, за которым
-// закреплено окно; смесь ниш помечается в задаче.
+// Booking: in the CRM a note on the lead's deal and a task for the manager to whom
+// the window is assigned; a mix of niches is marked in the task.
 func TestProcessCase_BookingWritesCRM(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -612,8 +612,8 @@ func TestProcessCase_BookingWritesCRM(t *testing.T) {
 	}
 }
 
-// Сбой модели переигрывается три раза, четвёртый уходит к человеку:
-// скриптовый ответ, задача в CRM, заморозка.
+// A model failure is replayed three times, the fourth goes to a human:
+// a scripted answer, a CRM task, freeze.
 func TestProcessCase_ModelFailureCeiling(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
@@ -649,8 +649,8 @@ func TestProcessCase_ModelFailureCeiling(t *testing.T) {
 	}
 }
 
-// После stop_contact, отказа по гейту и передачи человеку входящее не будит
-// кейс: хода нет, лиду не уходит ничего.
+// After stop_contact, a gate refusal and a handoff to a human an incoming message does not wake
+// the case: no turn, nothing goes to the lead.
 func TestFrozenCase_StaysSilent(t *testing.T) {
 	t.Parallel()
 	closing := map[qualify.Status]func(h *harness) result{

@@ -1,4 +1,4 @@
-// Команда lead-qualifier: `demo` - квалификация лида в консоли с фейковой CRM.
+// Command lead-qualifier: `demo` - qualification of a lead in the console with a fake CRM.
 package main
 
 import (

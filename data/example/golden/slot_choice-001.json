@@ -128,5 +128,5 @@
     "hour": "11:00"
   },
   "forbidden_response": [],
-  "reason": "Окна показаны, лид назвал день и час: book_slot на 6 октября 11:00."
+  "reason": "Windows were shown and the lead named a day and hour: book_slot for October 6, 11:00."
 }
