@@ -40,8 +40,12 @@ Checks of what the model says, and reliability when the model or its gateway fai
   an empty bullet in front of the window list.
 - A forbidden number in a golden fixture is not taken from the middle of a longer number.
 - `texts.json` requires two more texts: `meeting_alive` and `meeting_ack`.
-- `golang.org/x/text` 0.41.0 (GO-2026-6629, GO-2026-5970), `golang.org/x/sync` 0.22.0; report
-  files of `prompteval` are written with mode 0600.
+- `golang.org/x/sync` 0.22.0; report files of `prompteval` are written with mode 0600.
+
+### Security
+
+- `golang.org/x/text` 0.41.0 fixes GO-2026-6629 and GO-2026-5970, reachable through the Postgres
+  pool.
 
 ## [0.1.0] - 2026-10-21
 
