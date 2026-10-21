@@ -45,6 +45,8 @@ type Client struct {
 	guard     Guard
 	rules     qualify.Rules
 	location  *time.Location
+	// meetingAlive - the catalog text about a live booking, {time} and {manager}.
+	meetingAlive string
 }
 
 // New builds the client. A nil httpClient means the default client; the timeout
@@ -56,7 +58,7 @@ func New(cfg config.OpenRouter, catalog config.Catalog, prompts Prompts, kb know
 	}
 	return &Client{
 		cfg: cfg, http: httpClient, prompts: prompts, knowledge: kb,
-		guard: guard, rules: rules, location: catalog.Location,
+		guard: guard, rules: rules, location: catalog.Location, meetingAlive: catalog.Texts.MeetingAlive,
 	}
 }
 
@@ -230,4 +232,10 @@ func bodySnippet(body io.Reader) string {
 // sessionID is the same for all calls of a case: the provider keeps one route.
 func sessionID(caseID int64) string {
 	return "case:" + strconv.FormatInt(caseID, 10)
+}
+
+// MeetingAliveText - the answer about a live booking when a model draft was cut to nothing:
+// the time and the manager come from the database, not from the model.
+func (c *Client) MeetingAliveText(start time.Time, manager string) string {
+	return strings.NewReplacer("{time}", qualify.DateTimeText(start, c.location), "{manager}", manager).Replace(c.meetingAlive)
 }

@@ -34,6 +34,9 @@ type Texts struct {
 	SlotUnavailable string `json:"slot_unavailable"`
 	// SlotTaken - the hour was taken during the turn.
 	SlotTaken string `json:"slot_taken"`
+	// MeetingAlive - the answer about a live booking when a model draft claimed something the code
+	// did not do, {time}, {manager}.
+	MeetingAlive string `json:"meeting_alive"`
 	// MeetingConfirmed - booking confirmation, {time}, {manager}, {duration}.
 	MeetingConfirmed string `json:"meeting_confirmed"`
 }

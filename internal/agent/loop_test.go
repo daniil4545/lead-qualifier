@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -72,6 +73,11 @@ func (f *fakeOpenRouter) serve(t *testing.T) *httptest.Server {
 			name, f.script = f.script[0], f.script[1:]
 		}
 		f.mu.Unlock()
+		// A script entry that starts with "{" is a raw response body, not a recorded file.
+		if strings.HasPrefix(name, "{") {
+			_, _ = io.WriteString(w, name)
+			return
+		}
 		_, _ = w.Write(recorded(t, name))
 	}))
 	t.Cleanup(server.Close)
