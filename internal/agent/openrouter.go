@@ -37,6 +37,10 @@ func (f *ExternalFailure) Error() string {
 	return f.Kind + ": " + f.Message
 }
 
+// ProviderSide reports whether the failure is on the side of the model gateway or the network to it
+// (an outage, a rate limit, an empty balance) and not in what the model wrote.
+func (f *ExternalFailure) ProviderSide() bool { return strings.HasPrefix(f.Kind, "openrouter_") }
+
 // Client - the agent turn on top of OpenRouter for one catalog.
 type Client struct {
 	cfg       config.OpenRouter

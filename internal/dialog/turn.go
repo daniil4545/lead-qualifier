@@ -214,7 +214,7 @@ func (w *Worker) failTurn(ctx context.Context, claimAttempt int, input qualify.D
 	if errors.As(cause, &external) {
 		failure = external
 	}
-	if !failure.Permanent && claimAttempt <= agentMaxAttempts {
+	if !failure.Permanent && (claimAttempt <= agentMaxAttempts || w.outageContinues(ctx, input.Case.ID, failure)) {
 		return w.store.FailCase(ctx, input.Case.ID, claimAttempt, failure.Kind, failure.Message)
 	}
 	slog.Warn("turn retry ceiling reached", "case_id", input.Case.ID, "kind", failure.Kind,
@@ -230,6 +230,21 @@ func (w *Worker) failTurn(ctx context.Context, claimAttempt int, input qualify.D
 	raw["attempts"] = claimAttempt
 	decision.RawResponse = raw
 	return w.decisionRace(input.Case.ID, w.store.ApplyDecision(ctx, input.Case.ID, input.LastIncomingMessageID, decision, plan))
+}
+
+// outageContinues: a provider-side failure past the attempt ceiling still defers the turn while
+// the lead's oldest unanswered message has waited less than providerOutageWindow. A database
+// error here counts as "no": the lead must not be left without an answer by a failing check.
+func (w *Worker) outageContinues(ctx context.Context, caseID int64, failure *agent.ExternalFailure) bool {
+	if !failure.ProviderSide() {
+		return false
+	}
+	waited, err := w.store.UnansweredFor(ctx, caseID)
+	if err != nil {
+		slog.Warn("outage window check failed", "case_id", caseID, "error", err)
+		return false
+	}
+	return waited < providerOutageWindow
 }
 
 // rawResponse - the turn audit in decisions.raw_response: tools, knowledge base,

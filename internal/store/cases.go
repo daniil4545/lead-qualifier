@@ -253,6 +253,23 @@ func (s *Store) FailCase(ctx context.Context, caseID int64, claimAttempt int, ki
 	return nil
 }
 
+// UnansweredFor - how long the oldest lead message of the case without an answer has waited, by
+// the database clock. Zero if there is none.
+func (s *Store) UnansweredFor(ctx context.Context, caseID int64) (time.Duration, error) {
+	var seconds *float64
+	err := s.pool.QueryRow(ctx, `
+		SELECT EXTRACT(EPOCH FROM now() - min(created_at)) FROM messages
+		WHERE case_id = $1 AND direction = 'in' AND processed_at IS NULL
+	`, caseID).Scan(&seconds)
+	if err != nil {
+		return 0, fmt.Errorf("oldest unanswered message: %w", err)
+	}
+	if seconds == nil {
+		return 0, nil
+	}
+	return time.Duration(*seconds * float64(time.Second)), nil
+}
+
 // retryBackoff - the pause before a turn retry: 1, 2, 4 minutes and on up to 16.
 func retryBackoff(attempt int) time.Duration {
 	backoff := time.Minute

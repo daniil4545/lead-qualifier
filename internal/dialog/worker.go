@@ -40,6 +40,11 @@ const (
 	// agentMaxAttempts - how many times a failed turn is deferred and replayed;
 	// the next claim sends the case to a human instead of leaving the lead without an answer.
 	agentMaxAttempts = 3
+	// providerOutageWindow - how long a lead's message waits for a model gateway that is down
+	// before the case goes to a human. An outage is not the lead's problem or a decision: handing
+	// every conversation to a manager because the gateway is out for ten minutes would answer
+	// worse than waiting. The attempt ceiling above counts failures of what the model wrote.
+	providerOutageWindow = 24 * time.Hour
 	// offeredSlotsTTL - how long a shown set of windows lives.
 	offeredSlotsTTL = 48 * time.Hour
 )
