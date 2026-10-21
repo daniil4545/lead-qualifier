@@ -5,7 +5,7 @@
 Everything that differs between customers is in the catalog folder (`CATALOG_DIR`, default `data/example`):
 
 - `config.json` - company, persona and its gender, time zone, work hours, meeting length, model, tariffs (threshold, name, price), niche segments with thresholds, refusal reasons, managers, links;
-- `texts.json` - the greeting and ready replies of the code;
+- `texts.json` - the greeting and ready replies of the code, including `meeting_alive` (the reply about a live booking when a model draft claimed something the code did not do) and `meeting_ack` (the reply to a bare "ok" or "thanks" after the booking); every text is required;
 - `prompts/` - agent, critic, niche classifier;
 - `knowledge/` - the knowledge base for `search_kb`; `stop_names.txt` - whom the bot never names;
 - `golden/` and `niche_cases.tsv` - evaluation fixtures.
@@ -18,7 +18,7 @@ To plug in your own business, copy `data/example`, fill it in and run with `CATA
 make prompteval ARGS="-n 3"
 ```
 
-Needs an OpenRouter key. Every fixture from `data/example/golden` is run n times through a live model. The report shows the pass rate, unsafe outcomes and divergence classes. Runs that failed on transport are counted separately and make the command exit with an error. `-prompts` evaluates a candidate set of prompts against the same knowledge base, `-out` saves the report as JSON.
+Needs an OpenRouter key. Every fixture from `data/example/golden` is run n times through a live model. The report shows the pass rate, unsafe outcomes and divergence classes. Runs that failed on transport are counted separately and make the command exit with an error. `-prompts` evaluates a candidate set of prompts against the same knowledge base, `-out` saves the report as JSON. `-max-usd` (default 2) is a spending ceiling over all model calls of the run, the critic and the niche classifier included: it is checked before every turn, and when it is reached the run writes a partial report with the cost and exits with code 3.
 
 A fixture looks like this (shortened; texts are Russian):
 

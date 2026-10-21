@@ -6,6 +6,43 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-21
+
+Checks of what the model says, and reliability when the model or its gateway fails.
+
+### Added
+
+- Claim grounding (`internal/agent/claims.go`): a reply that says a meeting is booked, moved or
+  cancelled, that a manager is on the line or that the bot will return on a date is checked
+  against the live booking and the turn outcome. An ungrounded draft is regenerated once with a
+  remark, then the sentence is cut. A draft that was only claims becomes the booking text from the
+  database (`meeting_alive`), the windows of the day the lead named, or a handoff
+  (`claim_dropped`). The cut classes are written to the decision audit.
+- A bare confirmation ("ок", "спасибо", "до встречи") from a lead with a booking ahead is answered by
+  a catalog text (`meeting_ack`) without a model call; a repeat after that text stays silent.
+- `prompteval -max-usd` (default 2): a spending ceiling over all model calls, the critic and the
+  niche classifier included. A run that reaches it writes a partial report with the cost and exits
+  with code 3. The report carries `cost_usd` and `max_usd`.
+- The raw answer of a critic that broke the verdict format is kept in the decision audit
+  (`critic_raw`).
+- `make vuln` and a CI step with govulncheck; gosec runs inside golangci-lint.
+
+### Changed
+
+- A failure on the model gateway side (outage, rate limit, empty balance) no longer hands the
+  case to a human after three attempts: the turn is deferred, with a backoff of up to 16 minutes,
+  until the lead's oldest unanswered message is 24 hours old by the database clock. The ceiling of
+  three attempts stays for technical outcomes of what the model wrote.
+- A completion cut by the token cap (`finish_reason: length`) is treated as an empty answer: it
+  never reaches the critic or the history, the call repeats once, a second stump is
+  `empty_content`. The default cap is 2400 tokens instead of 1200.
+- A line of a single hyphen next to real text is removed before the checks, so it cannot become
+  an empty bullet in front of the window list.
+- A forbidden number in a golden fixture is not taken from the middle of a longer number.
+- `texts.json` requires two more texts: `meeting_alive` and `meeting_ack`.
+- `golang.org/x/text` 0.41.0 (GO-2026-6629, GO-2026-5970), `golang.org/x/sync` 0.22.0; report
+  files of `prompteval` are written with mode 0600.
+
 ## [0.1.0] - 2026-10-21
 
 First public release: a reference implementation, not a deployable product.
