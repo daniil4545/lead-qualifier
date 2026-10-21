@@ -1,32 +1,125 @@
 # lead-qualifier
 
-A lead qualification engine for B2B services. A bot talks to a person who left a request: it answers questions from a knowledge base, collects five facts about the company, decides whether to invite the lead to a meeting, and books a slot with a manager. The LLM runs the conversation and brings facts; deterministic Go code makes every decision.
+LLM agent that qualifies B2B leads in chat: the model talks, deterministic Go code decides.
 
-The project is small enough to read in an evening: a console demo, a fake CRM, Postgres in Docker, an OpenRouter key. It was extracted from a production service. The customer is replaced by a fictional company ("Тихая гавань", a managed IT support vendor), and all business data in `data/example` is made up.
+[![ci](https://github.com/daniil4545/lead-qualifier/actions/workflows/ci.yml/badge.svg)](https://github.com/daniil4545/lead-qualifier/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/daniil4545/lead-qualifier)](https://github.com/daniil4545/lead-qualifier/releases)
+[![license](https://img.shields.io/github/license/daniil4545/lead-qualifier)](LICENSE)
 
-User-facing texts are in Russian: the agent talks to Russian-speaking leads, so the prompts, the catalog content (knowledge base, ready replies, tariff and niche names), the golden dialogs and the demo prompts stay in Russian. Everything meant for developers is in English.
+![Console demo on the offline model: a question from the knowledge base, five facts, booking a slot, the CRM note and task](assets/demo.gif)
+
+A bot talks to a person who left a request: it answers questions from a knowledge base, collects five facts about the company, decides whether to invite the lead to a meeting, and books a slot with a manager. The LLM runs the conversation and brings facts; Go code makes every decision: the meeting gate, the price, the booking.
+
+The project is small enough to read in an evening: a console transport, an in-memory fake CRM, Postgres in Docker, OpenRouter as the model gateway. The company in the catalog ("Тихая гавань", a managed IT support vendor) is fictional, and all business data in `data/example` is made up.
+
+User-facing texts are in Russian: the agent talks to Russian-speaking leads, so the prompts, the catalog content and the golden dialogs stay in Russian. Everything meant for developers is in English.
+
+## Features
+
+| What | In one line |
+|---|---|
+| Decisions in code | the meeting gate, tariff and booking admission are table-tested Go, not prompt text |
+| Tool refusal as an answer | a forbidden tool call gets a reason; `dialog` re-checks the boundary |
+| Guard and critic | deterministic filters plus a strict-JSON model check on every draft, separate regeneration budgets |
+| Model failure is not a decision | deferred replay at 1, 2, 4 minutes, then a human gets a ready reply and a CRM task |
+| Outbox and journal | decision, booking and outgoing rows in one transaction; a unique index stops double booking |
+| Catalog as data | company, tariffs, niches, managers, texts, prompts and knowledge base are files; a second catalog runs the same tests |
+| Offline demo | the whole pipeline on a scripted stand-in for the model: no key, no network |
+| Prompt evaluation | `prompteval` runs 15 golden classes through a live model and reports the pass rate |
+
+## Install
+
+Needs Go 1.25 or newer and Docker (Postgres 16 from `docker-compose.yml`).
+
+```sh
+git clone https://github.com/daniil4545/lead-qualifier
+```
+
+The demo reads the catalog from `data/example`, so it runs from the clone. Releases carry notes, no binaries.
 
 ## Quick start
 
-You need Go, Docker and an OpenRouter key.
+1. Start the offline demo. It brings up Postgres, creates the schema and runs the console conversation on a scripted stand-in for the model:
 
-```sh
-export OPENROUTER_API_KEY=...
-make demo
+   ```sh
+   make demo-offline
+   ```
+
+   Every run books a slot in the local database; `docker compose down -v` resets it.
+
+2. Type the lead's name, then the lead's lines, one at a time. The bot answers after each. This is a real run; lines marked `>` are typed, window dates depend on the day you run it:
+
+   ```text
+   Имя лида: > Олег
+   [CRM lead lead-1] Олег
+
+   Бот: Здравствуйте, Олег! Меня зовут Вера, я помогаю команде «Тихой гавани» с заявками. ...
+
+   > А сколько времени занимает подключение?
+   Бот: Подключение занимает от одной до двух недель: инженер проводит аудит, ...
+
+   > У нас сеть из четырёх магазинов стройматериалов в Бердске, выручка около 12 млн в месяц. Я генеральный директор и владелец.
+   Бот: Вот ближайшие свободные окна для встречи с менеджером:
+   - четверг, 22 октября: 09:00-14:00 включительно
+   - понедельник, 26 октября: 09:00-14:00 включительно
+   - вторник, 27 октября: 09:00-14:00 включительно
+   Время новосибирское. Напишите, какой день и час вам удобны.
+
+   > Давайте в 11
+   Бот: Записала вас на встречу 22 октября в 11:00 по новосибирскому времени. Встречу проведёт Павел, длительность около 60 минут. До встречи!
+
+   [CRM note lead-1] Квалификатор: назначена встреча 22 октября в 11:00, менеджер Павел. Услуга: сеть из четырёх магазинов стройматериалов; выручка: 12000000; роль: генеральный директор; собственник: да; город: Бердск; направление: розничная торговля.
+   [CRM task lead-1, менеджер pavel] Встреча 22 октября в 11:00 с лидом Олег. ...
+   ```
+
+   Logs go to `demo.log`. Close the input with Ctrl+D.
+
+3. The offline model is a rule-based stub (`internal/stubmodel`) for this dialog. For a real model use your own OpenRouter key:
+
+   ```sh
+   export OPENROUTER_API_KEY=...
+   make demo
+   ```
+
+   The default model is `google/gemini-2.5-flash`, set in `data/example/config.json`.
+
+## Configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DATABASE_URL` | `make` sets the compose database on port 55432 | Postgres connection string, required |
+| `OPENROUTER_API_KEY` | none | required for `make demo` and `prompteval`; not needed with `--offline` |
+| `OPENROUTER_MODEL` | `model` of the catalog | model of the dialog turn |
+| `OPENROUTER_CRITIC_MODEL` | the dialog model | model of the critic and the niche classifier |
+| `OPENROUTER_URL` | OpenRouter chat completions | endpoint, for a proxy or a test double |
+| `CATALOG_DIR` | `data/example` | catalog directory |
+| `LOG_LEVEL` | `info` | log level of the demo |
+| `LQ_LIVE_MODEL` | unset | `1` enables the live niche classifier test |
+
+## How it works
+
+```mermaid
+flowchart LR
+    L[Lead message] --> I[store.Ingest]
+    I --> T[agent.RunTurn: model with tools]
+    T --> F[guard and critic]
+    F --> D[dialog: re-check and gate]
+    D --> A[(ApplyDecision: one transaction)]
+    A --> O[outbox delivery: reply and CRM]
 ```
 
-The demo asks for the lead's name, creates a request in the fake CRM, and the bot writes first. After that every input line is a message from the lead. CRM records are printed as `[CRM <kind> <lead>] <text>` lines, logs go to `demo.log`. The default model is `google/gemini-2.5-flash`, set in `data/example/config.json` and overridable with `OPENROUTER_MODEL`.
+One agent turn is a loop of model calls with native tool calling. The tools are `search_kb`, `save_facts`, `complete`, `offer_slots`, `book_slot`, `escalate`, `refuse` and `stop_contact`. The loop writes nothing itself: it returns an untrusted result, and the `dialog` package validates it and applies it. Details of the case model, the gate outcomes, the invariants and the package map are in [docs/architecture.md](docs/architecture.md).
 
-## How a turn works
+## Privacy and safety
 
-One agent turn is a loop of model calls with native tool calling. The tools are `search_kb`, `save_facts`, `complete`, `offer_slots`, `book_slot`, `escalate`, `refuse` and `stop_contact`. The loop writes nothing itself: it returns an untrusted result, and the `dialog` package validates it and applies it.
+The demo sends lead messages to the model gateway. What the code promises about that:
 
-1. `store.Ingest` saves the lead's message and queues the case.
-2. `agent.RunTurn` runs the model with tools; the guard and the critic check every text draft.
-3. Go re-checks the turn and computes the gate; `store.ApplyDecision` writes the decision, status, booking and outbox rows in one transaction.
-4. `dialog.DeliverNext` sends the reply to the lead and writes the note and task to the CRM.
-
-Details of the case model, the gate outcomes and the invariants are in [docs/architecture.md](docs/architecture.md).
+| Promise | Checked by |
+|---|---|
+| Every model call asks the provider not to store data and to honor all parameters | `newRequest` in `internal/agent/openrouter.go` (`data_collection: deny`, `require_parameters`) |
+| The API key comes from the environment only, never from a file | `LoadOpenRouter` in `internal/config/config.go`; `.env` is in `.gitignore` |
+| Quotes from drafts and provider error bodies go to the decision audit in the database, not to the log | log calls carry ids, categories and counters; see `internal/agent/loop.go` |
+| Prices, names, phones, e-mail and links outside the catalog never reach the lead | `internal/agent/guard.go`, table tests in `guard_test.go`, startup validation of the knowledge base |
 
 ## Engineering decisions
 
@@ -43,37 +136,11 @@ The central idea: the model brings facts and writes text, the code decides. Ever
 9. **Offline evaluation first, live model second.** `data/example/golden` holds 15 classes of one-turn fixtures (full facts, knowledge base question, injection, price insistence, slot choice, reschedule, and so on). Offline, the fixtures are checked for consistency against the tool contract and the catalog. `prompteval` runs them through a live model n times and reports the pass rate, unsafe outcomes and divergence classes; transport failures are counted separately and fail the run. A fixture checks the action, the tool arguments, the facts snapshot and forbidden substrings. It does not judge the quality of the text: that stays with the critic and a human.
 10. **Boring infrastructure.** JSON config on the standard library, one idempotent migration at start, `pgx` for Postgres, no framework, packages split by domain boundary. Rejected: deferred follow-up touches for silent leads (they need a scheduler, and the project has none) and a refusal that waits for revenue growth, for the same reason.
 
-## Catalog: your own business without code changes
+## Catalog and prompt evaluation
 
-Everything that differs between customers is in the catalog folder (`CATALOG_DIR`, default `data/example`):
+Everything that differs between customers (company, persona, tariffs, niches, managers, texts, prompts, knowledge base, golden fixtures) is a file in `CATALOG_DIR`, default `data/example`. To plug in your own business, copy it, fill it in and run with `CATALOG_DIR=path`.
 
-- `config.json` - company, persona and its gender, time zone, work hours, meeting length, model, tariffs (threshold, name, price), niche segments with thresholds, refusal reasons, managers, links;
-- `texts.json` - the greeting and ready replies of the code;
-- `prompts/` - agent, critic, niche classifier;
-- `knowledge/` - the knowledge base for `search_kb`; `stop_names.txt` - whom the bot never names;
-- `golden/` and `niche_cases.tsv` - evaluation fixtures.
-
-To plug in your own business, copy `data/example`, fill it in and run with `CATALOG_DIR=path`.
-
-## Prompt evaluation
-
-```sh
-make prompteval ARGS="-n 3"
-```
-
-Every fixture from `data/example/golden` is run n times through a live model. The report shows the pass rate, unsafe outcomes and divergence classes. Runs that failed on transport are counted separately and make the command exit with an error. `-prompts` evaluates a candidate set of prompts against the same knowledge base, `-out` saves the report as JSON.
-
-A fixture looks like this (shortened; texts are Russian):
-
-```json
-{
-  "class": "happy_path",
-  "case_status": "collecting",
-  "messages": [{"author": "lead", "text": "У нас сеть из четырёх магазинов стройматериалов в Бердске, выручка около 12 млн в месяц. Я генеральный директор и владелец компании."}],
-  "expected_action": "complete",
-  "expected_facts": {"monthly_revenue": "12000000", "is_owner": true, "city": "бердск"}
-}
-```
+`make prompteval ARGS="-n 3"` runs the 15 golden fixture classes through a live model n times and reports the pass rate, unsafe outcomes and divergence classes; it needs an OpenRouter key. The file layout and a fixture example are in [docs/catalog.md](docs/catalog.md).
 
 ## Tests
 
@@ -83,32 +150,15 @@ make test        # with Postgres from docker-compose
 make check       # gofmt, vet, golangci-lint, full tests, build
 ```
 
-The live niche classifier test over `niche_cases.tsv` is enabled with `LQ_LIVE_MODEL=1` and needs `OPENROUTER_API_KEY`. CI runs build, vet, gofmt, golangci-lint and the full test suite against a Postgres service.
+The offline demo has an end-to-end test on a temporary database (`cmd/lead-qualifier/demo_test.go`). The live niche classifier test is enabled with `LQ_LIVE_MODEL=1`. CI runs build, vet, gofmt, golangci-lint and the full suite against a Postgres service.
 
-## Packages
-
-| Package | Contents |
-|---|---|
-| `config` | environment and catalog, validation at start |
-| `qualify` | case and statuses, facts, tariffs, niche, gate |
-| `knowledge` | knowledge base and its validation |
-| `crm` | CRM interface and an in-memory fake |
-| `calendar` | free windows of managers |
-| `agent` | turn loop, OpenRouter, guard, critic, niche classifier, prompts |
-| `store` | Postgres: cases, messages, decisions, bookings, outbox |
-| `dialog` | handler: case claim, turn, applying the decision, delivery |
-| `console` | demo transport |
-| `eval` | golden fixtures and turn evaluation |
-
-Commands: `cmd/lead-qualifier` (`demo`) and `cmd/prompteval`.
-
-## Status and limitations
+## Limitations
 
 - A working reference implementation, not a deployable product. The only transport is the console, the only CRM is an in-memory fake; real integrations would implement the `Sender` and `crm.CRM` interfaces.
 - One process, one database. There is no scheduler, so a silent lead gets no follow-up touches and a refusal on revenue closes the case.
 - The golden fixtures cover one turn per class, not whole conversations. I have not published pass rates for any model: run `make prompteval` against the model you intend to use.
+- The offline model is a scripted stub for one dialog. It shows the pipeline around the model, not the quality of a model.
 - The guard filters and the catalog texts target Russian; another language needs new patterns, prompts and texts.
-- The knowledge base and all business data in `data/example` are fictional.
 
 ## License
 
