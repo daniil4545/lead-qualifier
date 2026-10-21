@@ -2,12 +2,16 @@
 DATABASE_URL ?= postgres://lq:lq@localhost:55432/lq?sslmode=disable
 export DATABASE_URL
 
-.PHONY: demo db build vet fmt-check lint test test-fast check prompteval
+.PHONY: demo demo-offline db build vet fmt-check lint test test-fast check prompteval
 
 # Console demo: only OPENROUTER_API_KEY is needed. Logs go to demo.log
 # so they do not interfere with the conversation.
 demo: db
 	go run ./cmd/lead-qualifier demo 2>>demo.log
+
+# The same demo with a scripted stand-in for the model: needs Docker, no key and no network.
+demo-offline: db
+	go run ./cmd/lead-qualifier demo --offline 2>>demo.log
 
 db:
 	docker compose up -d --wait postgres
