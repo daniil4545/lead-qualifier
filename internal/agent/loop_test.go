@@ -27,6 +27,8 @@ type fakeOpenRouter struct {
 	mu       sync.Mutex
 	script   []string
 	fallback string
+	// critic - a raw response body for the critic instead of the recorded "ok".
+	critic string
 }
 
 func recorded(t *testing.T, name string) []byte {
@@ -58,6 +60,10 @@ func (f *fakeOpenRouter) serve(t *testing.T) *httptest.Server {
 		w.Header().Set("Content-Type", "application/json")
 		if req.ResponseFormat != nil {
 			if _, critic := req.ResponseFormat.JSONSchema.Schema.Properties["problems"]; critic {
+				if f.critic != "" {
+					_, _ = io.WriteString(w, f.critic)
+					return
+				}
 				_, _ = w.Write(recorded(t, "critic_ok.json"))
 				return
 			}

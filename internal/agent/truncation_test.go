@@ -60,3 +60,19 @@ func TestDropDashLines(t *testing.T) {
 		})
 	}
 }
+
+// A critic that breaks the verdict format is a technical failure of the turn, and its raw answer
+// is kept for the audit.
+func TestRunTurn_CriticFormatErrorKeepsRawAnswer(t *testing.T) {
+	t.Parallel()
+	fx := loadFixture(t)
+	input := turnInput(qualify.StatusCollecting, fx.fullFacts("3000000", ""), "Спасибо, всё понятно.")
+	fake := &fakeOpenRouter{script: []string{chat("Рада, что всё понятно.", "stop")}, critic: chat("Всё хорошо, отправляйте", "stop")}
+	turn, err := fx.clientWith(t, fake).RunTurn(context.Background(), input)
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	if turn.Reason != "critic_error" || turn.FinalText != "" || turn.Trace.CriticRaw != "Всё хорошо, отправляйте" {
+		t.Fatalf("reason=%q text=%q raw=%q, want critic_error with the raw answer", turn.Reason, turn.FinalText, turn.Trace.CriticRaw)
+	}
+}

@@ -58,6 +58,28 @@ type criticPayload struct {
 	MeetingTimes    []string `json:"meeting_times,omitempty"`
 }
 
+// maxRawCriticRunes - how much of a broken critic answer the audit keeps.
+const maxRawCriticRunes = 2000
+
+// CriticFormatError - the critic answered with something that is not the verdict JSON. The raw
+// answer goes into the decision audit (never the log): without it a critic_error can be
+// explained only by guessing what the model wrote.
+type CriticFormatError struct {
+	Raw string
+	Err error
+}
+
+func (e *CriticFormatError) Error() string { return "decode critic verdict: " + e.Err.Error() }
+func (e *CriticFormatError) Unwrap() error { return e.Err }
+
+func truncateRunes(value string, limit int) string {
+	runes := []rune(value)
+	if len(runes) <= limit {
+		return value
+	}
+	return string(runes[:limit])
+}
+
 // criticCheck - one strict-JSON critic call. A transport failure goes up as
 // ExternalFailure (the turn is replayed), an unintelligible answer as an ordinary
 // error (critic_error).
@@ -84,7 +106,7 @@ func (c *Client) criticCheck(ctx context.Context, caseID int64, payload criticPa
 		} `json:"problems"`
 	}
 	if err := json.Unmarshal([]byte(trimJSONFence(resp.Choices[0].Message.Content)), &wire); err != nil {
-		return CriticVerdict{}, fmt.Errorf("decode critic verdict: %w", err)
+		return CriticVerdict{}, &CriticFormatError{Raw: truncateRunes(resp.Choices[0].Message.Content, maxRawCriticRunes), Err: err}
 	}
 	verdict := CriticVerdict{}
 	for _, problem := range wire.Problems {

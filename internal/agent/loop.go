@@ -67,6 +67,8 @@ type Trace struct {
 	Calls   int
 	Guard   []Violation
 	Critic  []CriticVerdict
+	// CriticRaw - the raw answer of a critic that broke the verdict format.
+	CriticRaw string
 	// Claims - the class of every sentence cut for a claim the code does not back.
 	Claims []string
 }
@@ -264,6 +266,10 @@ func (s *turnState) handleText(candidate string, dash bool) (bool, error) {
 		var failure *ExternalFailure
 		if errors.As(err, &failure) {
 			return false, err
+		}
+		var format *CriticFormatError
+		if errors.As(err, &format) {
+			s.turn.Trace.CriticRaw = format.Raw
 		}
 		slog.Warn("critic error", "case_id", s.input.Case.ID, "error", err)
 		s.rejectReply("critic_error")

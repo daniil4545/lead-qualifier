@@ -252,5 +252,11 @@ func rawResponse(turn agent.Turn) map[string]any {
 	if len(turn.Trace.Critic) > 0 {
 		raw["critic"] = turn.Trace.Critic
 	}
+	if turn.Trace.CriticRaw != "" {
+		raw["critic_raw"] = turn.Trace.CriticRaw
+	}
+	if len(turn.Trace.Claims) > 0 {
+		raw["claims"] = turn.Trace.Claims
+	}
 	return raw
 }
