@@ -184,13 +184,32 @@ const (
 	IssueCriticLeak    = "critic_leak"
 )
 
+// containsForbidden reports whether text contains the forbidden part. A part that starts with
+// a digit is not taken from the middle of a number: "12 000" does not lie in "112 000".
+func containsForbidden(text, part string) bool {
+	if part[0] < '0' || part[0] > '9' {
+		return strings.Contains(text, part)
+	}
+	for from := 0; ; {
+		at := strings.Index(text[from:], part)
+		if at < 0 {
+			return false
+		}
+		at += from
+		if at == 0 || text[at-1] < '0' || text[at-1] > '9' {
+			return true
+		}
+		from = at + 1
+	}
+}
+
 // Evaluate compares the observed turn outcome with the fixture. An empty answer means the turn
 // passed.
 func Evaluate(fixture Fixture, turn agent.Turn) []Issue {
 	var issues []Issue
 	lowered := strings.ToLower(turn.FinalText)
 	for _, part := range fixture.ForbiddenResponse {
-		if trimmed := strings.ToLower(strings.TrimSpace(part)); trimmed != "" && strings.Contains(lowered, trimmed) {
+		if trimmed := strings.ToLower(strings.TrimSpace(part)); trimmed != "" && containsForbidden(lowered, trimmed) {
 			issues = append(issues, Issue{IssueForbiddenText, fmt.Sprintf("final text contains %q", part)})
 		}
 	}

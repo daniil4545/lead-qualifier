@@ -254,3 +254,27 @@ func TestEvaluate(t *testing.T) {
 		})
 	}
 }
+
+func TestContainsForbidden(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name, text, part string
+		want             bool
+	}{
+		{"word", "стоит дорого", "дорого", true},
+		{"word absent", "стоит недорого", "дорого", true}, // words are plain substrings
+		{"number alone", "тариф 12 000 руб", "12 000", true},
+		{"number inside a longer one", "тариф 112 000 руб", "12 000", false},
+		{"number at the start", "12 000 руб", "12 000", true},
+		{"inside first, standalone later", "112 000 или 12 000", "12 000", true},
+		{"absent", "бесплатно", "12 000", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := containsForbidden(tc.text, tc.part); got != tc.want {
+				t.Fatalf("containsForbidden(%q, %q) = %v, want %v", tc.text, tc.part, got, tc.want)
+			}
+		})
+	}
+}
