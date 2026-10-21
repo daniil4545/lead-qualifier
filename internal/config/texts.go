@@ -37,6 +37,9 @@ type Texts struct {
 	// MeetingAlive - the answer about a live booking when a model draft claimed something the code
 	// did not do, {time}, {manager}.
 	MeetingAlive string `json:"meeting_alive"`
+	// MeetingAck - the answer to a bare confirmation ("ок", "спасибо") from a lead with a live
+	// booking. The code answers it without a model call.
+	MeetingAck string `json:"meeting_ack"`
 	// MeetingConfirmed - booking confirmation, {time}, {manager}, {duration}.
 	MeetingConfirmed string `json:"meeting_confirmed"`
 }

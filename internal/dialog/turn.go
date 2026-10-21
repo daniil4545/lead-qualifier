@@ -25,6 +25,9 @@ func (w *Worker) ProcessCase(ctx context.Context, caseID int64, claimAttempt int
 	if input.Meeting != nil {
 		input.ManagerName = w.managerName(input.Meeting.ManagerID)
 	}
+	if handled, err := w.acknowledgeMeeting(ctx, input); handled || err != nil {
+		return err
+	}
 	turn, err := w.agent.RunTurn(ctx, input)
 	if err != nil {
 		return w.failTurn(ctx, claimAttempt, input, turn, err)
